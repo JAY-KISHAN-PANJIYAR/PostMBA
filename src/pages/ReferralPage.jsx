@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { getUrgency, daysSince } from '../lib/utils.js'
 import ContactCard from '../components/ContactCard.jsx'
+import GridCard from '../components/GridCard.jsx'
+import KanbanBoard from '../components/KanbanBoard.jsx'
 import ContactModal from '../components/ContactModal.jsx'
 import TagManagerModal from '../components/TagManagerModal.jsx'
 
@@ -26,6 +28,42 @@ function generateInsight(contacts) {
   return 'All contacts are up to date.'
 }
 
+function ViewToggle({ view, onChange }) {
+  const views = [
+    { id: 'list',   icon: 'ti-list',        label: 'List' },
+    { id: 'grid',   icon: 'ti-layout-grid', label: 'Grid' },
+    { id: 'kanban', icon: 'ti-layout-columns', label: 'Kanban' },
+  ]
+  return (
+    <div style={{
+      display: 'flex', gap: 2,
+      background: 'var(--surface2)',
+      borderRadius: 8, padding: 3,
+    }}>
+      {views.map(v => (
+        <button
+          key={v.id}
+          onClick={() => onChange(v.id)}
+          title={v.label}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '5px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
+            background: view === v.id ? 'var(--surface)' : 'transparent',
+            color: view === v.id ? 'var(--text)' : 'var(--text3)',
+            fontWeight: view === v.id ? 500 : 400,
+            fontSize: 12,
+            boxShadow: view === v.id ? '0 0 0 0.5px var(--border-strong)' : 'none',
+            transition: 'all 0.1s',
+          }}
+        >
+          <i className={`ti ${v.icon}`} style={{ fontSize: 14 }} />
+          {v.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function ReferralPage() {
   const [contacts, setContacts] = useState([])
   const [tags, setTags] = useState([])
@@ -34,6 +72,7 @@ export default function ReferralPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterTagId, setFilterTagId] = useState('all')
   const [sortBy, setSortBy] = useState('urgency')
+  const [view, setView] = useState('list')
   const [showModal, setShowModal] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
   const [showTagManager, setShowTagManager] = useState(false)
@@ -69,7 +108,6 @@ export default function ReferralPage() {
 
   const filtered = useMemo(() => {
     let list = [...contacts]
-
     if (search) {
       const q = search.toLowerCase()
       list = list.filter(c =>
@@ -78,7 +116,6 @@ export default function ReferralPage() {
         (c.email || '').toLowerCase().includes(q)
       )
     }
-
     if (filterStatus !== 'all') {
       list = list.filter(c => {
         const u = getUrgency(c)
@@ -87,11 +124,9 @@ export default function ReferralPage() {
         return u === filterStatus
       })
     }
-
     if (filterTagId !== 'all') {
       list = list.filter(c => (c.contact_tags || []).some(ct => ct.tag_id === filterTagId))
     }
-
     list.sort((a, b) => {
       if (sortBy === 'urgency') return (URGENCY_ORDER[getUrgency(a)] ?? 9) - (URGENCY_ORDER[getUrgency(b)] ?? 9)
       if (sortBy === 'company') return (a.company || '').localeCompare(b.company || '')
@@ -103,12 +138,16 @@ export default function ReferralPage() {
       }
       return 0
     })
-
     return list
   }, [contacts, search, filterStatus, filterTagId, sortBy])
 
   const activeContacts = filtered.filter(c => c.is_active)
   const inactiveContacts = filtered.filter(c => !c.is_active)
+
+  function openEdit(contact) {
+    setEditingContact(contact)
+    setShowModal(true)
+  }
 
   if (loading) return <div className="loading"><i className="ti ti-loader" /> Loading contacts…</div>
 
@@ -119,9 +158,10 @@ export default function ReferralPage() {
           <i className="ti ti-users" style={{ marginRight: 8, fontSize: 20 }} />
           Referral details
         </h1>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ViewToggle view={view} onChange={setView} />
           <button className="btn btn-sm" onClick={() => setShowTagManager(true)}>
-            <i className="ti ti-tag" /> Manage tags
+            <i className="ti ti-tag" /> Tags
           </button>
           <button className="btn btn-primary" onClick={() => { setEditingContact(null); setShowModal(true) }}>
             <i className="ti ti-plus" /> Add contact
@@ -147,94 +187,144 @@ export default function ReferralPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="filter-bar">
-        <input
-          className="search-input"
-          placeholder="Search name, company, email…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)}>
-          {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </div>
-
-      <div className="filter-bar" style={{ marginBottom: 8 }}>
-        <div className="pill-group">
-          {[
-            { value: 'all', label: 'All' },
-            { value: 'active', label: 'Active' },
-            { value: 'inactive', label: 'Inactive' },
-            { value: 'overdue', label: 'Overdue' },
-            { value: 'soon', label: 'Follow up soon' },
-            { value: 'secured', label: 'Secured' },
-          ].map(p => (
-            <button key={p.value} className={`pill${filterStatus === p.value ? ' active' : ''}`} onClick={() => setFilterStatus(p.value)}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tag filter row */}
-      <div className="filter-bar" style={{ marginBottom: 16 }}>
-        <span style={{ fontSize: 11, color: 'var(--text3)', marginRight: 2 }}>Tags:</span>
-        <div className="pill-group">
-          <button className={`pill${filterTagId === 'all' ? ' active' : ''}`} onClick={() => setFilterTagId('all')}>All</button>
-          {tags.map(tag => (
-            <button
-              key={tag.id}
-              className="pill"
-              style={filterTagId === tag.id ? { background: tag.color, color: tag.text_color, borderColor: tag.color } : {}}
-              onClick={() => setFilterTagId(filterTagId === tag.id ? 'all' : tag.id)}
-            >
-              {tag.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Active contacts */}
-      {activeContacts.length > 0 && (
+      {/* Filters — hidden in kanban since kanban has its own grouping */}
+      {view !== 'kanban' && (
         <>
-          <div className="section-header">
-            <span className="section-dot" style={{ background: '#27500A' }} />
-            Active contacts ({activeContacts.length})
-          </div>
-          {activeContacts.map(c => (
-            <ContactCard
-              key={c.id}
-              contact={c}
-              tags={tags}
-              onEdit={c => { setEditingContact(c); setShowModal(true) }}
-              onDelete={c => setDeleteConfirm(c)}
+          <div className="filter-bar">
+            <input
+              className="search-input"
+              placeholder="Search name, company, email…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
             />
-          ))}
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="filter-bar" style={{ marginBottom: 8 }}>
+            <div className="pill-group">
+              {[
+                { value: 'all', label: 'All' },
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'overdue', label: 'Overdue' },
+                { value: 'soon', label: 'Follow up soon' },
+                { value: 'secured', label: 'Secured' },
+              ].map(p => (
+                <button key={p.value} className={`pill${filterStatus === p.value ? ' active' : ''}`} onClick={() => setFilterStatus(p.value)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-bar" style={{ marginBottom: 16 }}>
+            <span style={{ fontSize: 11, color: 'var(--text3)', marginRight: 2 }}>Tags:</span>
+            <div className="pill-group">
+              <button className={`pill${filterTagId === 'all' ? ' active' : ''}`} onClick={() => setFilterTagId('all')}>All</button>
+              {tags.map(tag => (
+                <button
+                  key={tag.id}
+                  className="pill"
+                  style={filterTagId === tag.id ? { background: tag.color, color: tag.text_color, borderColor: tag.color } : {}}
+                  onClick={() => setFilterTagId(filterTagId === tag.id ? 'all' : tag.id)}
+                >
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+          </div>
         </>
       )}
 
-      {/* Inactive contacts */}
-      {inactiveContacts.length > 0 && (
+      {/* Kanban search bar */}
+      {view === 'kanban' && (
+        <div className="filter-bar" style={{ marginBottom: 16 }}>
+          <input
+            className="search-input"
+            placeholder="Search name, company…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      )}
+
+      {/* ── LIST VIEW ── */}
+      {view === 'list' && (
         <>
-          <div className="section-header" style={{ marginTop: 20 }}>
-            <span className="section-dot" style={{ background: 'var(--text3)' }} />
-            Inactive contacts ({inactiveContacts.length}) — no current action needed
-          </div>
-          {inactiveContacts.map(c => (
-            <ContactCard
-              key={c.id}
-              contact={c}
-              tags={tags}
-              onEdit={c => { setEditingContact(c); setShowModal(true) }}
-              onDelete={c => setDeleteConfirm(c)}
-            />
-          ))}
+          {activeContacts.length > 0 && (
+            <>
+              <div className="section-header">
+                <span className="section-dot" style={{ background: '#27500A' }} />
+                Active contacts ({activeContacts.length})
+              </div>
+              {activeContacts.map(c => (
+                <ContactCard key={c.id} contact={c} tags={tags}
+                  onEdit={openEdit} onDelete={c => setDeleteConfirm(c)} />
+              ))}
+            </>
+          )}
+          {inactiveContacts.length > 0 && (
+            <>
+              <div className="section-header" style={{ marginTop: 20 }}>
+                <span className="section-dot" style={{ background: 'var(--text3)' }} />
+                Inactive ({inactiveContacts.length})
+              </div>
+              {inactiveContacts.map(c => (
+                <ContactCard key={c.id} contact={c} tags={tags}
+                  onEdit={openEdit} onDelete={c => setDeleteConfirm(c)} />
+              ))}
+            </>
+          )}
+          {filtered.length === 0 && <div className="empty">No contacts match your filters.</div>}
         </>
       )}
 
-      {filtered.length === 0 && !loading && (
-        <div className="empty">No contacts match your filters.</div>
+      {/* ── GRID VIEW ── */}
+      {view === 'grid' && (
+        <>
+          {activeContacts.length > 0 && (
+            <>
+              <div className="section-header">
+                <span className="section-dot" style={{ background: '#27500A' }} />
+                Active contacts ({activeContacts.length})
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                gap: 12, marginBottom: 24,
+              }}>
+                {activeContacts.map(c => (
+                  <GridCard key={c.id} contact={c} tags={tags}
+                    onEdit={openEdit} onDelete={c => setDeleteConfirm(c)} />
+                ))}
+              </div>
+            </>
+          )}
+          {inactiveContacts.length > 0 && (
+            <>
+              <div className="section-header">
+                <span className="section-dot" style={{ background: 'var(--text3)' }} />
+                Inactive ({inactiveContacts.length})
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                gap: 12,
+              }}>
+                {inactiveContacts.map(c => (
+                  <GridCard key={c.id} contact={c} tags={tags}
+                    onEdit={openEdit} onDelete={c => setDeleteConfirm(c)} />
+                ))}
+              </div>
+            </>
+          )}
+          {filtered.length === 0 && <div className="empty">No contacts match your filters.</div>}
+        </>
+      )}
+
+      {/* ── KANBAN VIEW ── */}
+      {view === 'kanban' && (
+        <KanbanBoard contacts={filtered} tags={tags} onEdit={openEdit} />
       )}
 
       {/* Modals */}
@@ -246,7 +336,6 @@ export default function ReferralPage() {
           onSaved={() => { setShowModal(false); load() }}
         />
       )}
-
       {showTagManager && (
         <TagManagerModal
           tags={tags}
@@ -254,19 +343,17 @@ export default function ReferralPage() {
           onSaved={load}
         />
       )}
-
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" style={{ maxWidth: 360 }}>
             <div className="modal-title">Delete contact?</div>
             <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>
-              This will permanently delete <strong>{deleteConfirm.name || deleteConfirm.company}</strong>. This cannot be undone.
+              This will permanently delete <strong>{deleteConfirm.name || deleteConfirm.company}</strong>. Cannot be undone.
             </p>
             <div className="modal-actions">
               <button className="btn" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn" style={{ background: '#FCEBEB', color: '#A32D2D', borderColor: '#F09595' }} onClick={() => deleteContact(deleteConfirm)}>
-                Delete
-              </button>
+              <button className="btn" style={{ background: '#FCEBEB', color: '#A32D2D', borderColor: '#F09595' }}
+                onClick={() => deleteContact(deleteConfirm)}>Delete</button>
             </div>
           </div>
         </div>
