@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase.js'
 import { getUrgency, daysSince } from '../lib/utils.js'
 import ContactCard from '../components/ContactCard.jsx'
 import GridCard from '../components/GridCard.jsx'
-import KanbanBoard from '../components/KanbanBoard.jsx'
 import ContactModal from '../components/ContactModal.jsx'
 import TagManagerModal from '../components/TagManagerModal.jsx'
 
