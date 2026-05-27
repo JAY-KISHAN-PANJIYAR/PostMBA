@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase.js'
 const EMPTY = {
   sn: '', company: '', name: '', referred_by: '', email: '',
   mobile: '', next_meeting: '', referral_status: '', action_item: '',
-  last_contact: '', notes: '', is_active: true
+  last_contact: '', notes: '', referral_notes: '', other_notes: '', is_active: true
 }
 
 const STATUS_OPTIONS = [
@@ -15,7 +15,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function ContactModal({ contact, tags, onClose, onSaved }) {
-  const [form, setForm] = useState(contact ? { ...contact } : { ...EMPTY })
+  const [form, setForm] = useState(contact ? { ...EMPTY, ...contact } : { ...EMPTY })
   const [selectedTags, setSelectedTags] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -52,6 +52,8 @@ export default function ContactModal({ contact, tags, onClose, onSaved }) {
       action_item: form.action_item || null,
       last_contact: form.last_contact || null,
       notes: form.notes || null,
+      referral_notes: form.referral_notes || null,
+      other_notes: form.other_notes || null,
       is_active: form.is_active,
       updated_at: new Date().toISOString(),
     }
@@ -66,7 +68,6 @@ export default function ContactModal({ contact, tags, onClose, onSaved }) {
       contactId = data.id
     }
 
-    // Sync tags
     await supabase.from('contact_tags').delete().eq('contact_id', contactId)
     if (selectedTags.length > 0) {
       await supabase.from('contact_tags').insert(
@@ -123,10 +124,21 @@ export default function ContactModal({ contact, tags, onClose, onSaved }) {
             <label>Action item</label>
             <input value={form.action_item || ''} onChange={e => set('action_item', e.target.value)} placeholder="Follow up on referral" />
           </div>
+
+          {/* Three note fields */}
           <div className="form-group full">
             <label>Notes</label>
-            <textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="Meeting notes, context, links…" rows={4} />
+            <textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="General notes, meeting context, links…" rows={3} />
           </div>
+          <div className="form-group full">
+            <label>Referral notes</label>
+            <textarea value={form.referral_notes || ''} onChange={e => set('referral_notes', e.target.value)} placeholder="Referral ask details, job IDs sent, referral progress…" rows={3} />
+          </div>
+          <div className="form-group full">
+            <label>Other notes</label>
+            <textarea value={form.other_notes || ''} onChange={e => set('other_notes', e.target.value)} placeholder="Background info, personal context, anything else…" rows={3} />
+          </div>
+
           <div className="form-group full">
             <label>Tags</label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>

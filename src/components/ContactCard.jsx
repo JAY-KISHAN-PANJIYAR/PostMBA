@@ -7,6 +7,20 @@ function fmt(dateStr) {
   try { return format(parseISO(dateStr), 'MMM d, yyyy') } catch { return dateStr }
 }
 
+function NoteBlock({ label, content, color }) {
+  if (!content) return null
+  return (
+    <div style={{
+      background: color || 'var(--surface2)',
+      borderRadius: 6, padding: '8px 10px',
+      marginTop: 6,
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{content}</div>
+    </div>
+  )
+}
+
 export default function ContactCard({ contact, tags, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false)
   const urgency = getUrgency(contact)
@@ -18,18 +32,14 @@ export default function ContactCard({ contact, tags, onEdit, onDelete }) {
     tags.find(t => t.id === ct.tag_id)
   ).filter(Boolean)
 
-  const borderColor = cfg.border
-  const isInactive = !contact.is_active
-
   return (
     <div
       className="card"
       style={{
         marginBottom: 7,
-        borderLeft: `3px solid ${borderColor}`,
-        borderRadius: `0 ${12}px ${12}px 0`,
-        opacity: isInactive ? 0.6 : 1,
-        transition: 'opacity 0.15s',
+        borderLeft: `3px solid ${cfg.border}`,
+        borderRadius: `0 12px 12px 0`,
+        opacity: !contact.is_active ? 0.6 : 1,
       }}
     >
       {/* Main row */}
@@ -37,7 +47,6 @@ export default function ContactCard({ contact, tags, onEdit, onDelete }) {
         style={{ display: 'grid', gridTemplateColumns: '38px 1fr auto', gap: 12, padding: '11px 14px', cursor: 'pointer', alignItems: 'start' }}
         onClick={() => setExpanded(e => !e)}
       >
-        {/* Avatar */}
         <div style={{
           width: 38, height: 38, borderRadius: '50%',
           background: bg, color: fg,
@@ -47,7 +56,6 @@ export default function ContactCard({ contact, tags, onEdit, onDelete }) {
           {initials(contact.name || contact.company)}
         </div>
 
-        {/* Content */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
             <span style={{ fontWeight: 600, fontSize: 13 }}>{contact.name || '—'}</span>
@@ -73,14 +81,14 @@ export default function ContactCard({ contact, tags, onEdit, onDelete }) {
             </div>
           )}
 
-          {contact.notes && !expanded && (
+          {/* Preview of first available note when collapsed */}
+          {!expanded && (contact.notes || contact.referral_notes || contact.other_notes) && (
             <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 400 }}>
-              {contact.notes}
+              {contact.referral_notes || contact.notes || contact.other_notes}
             </div>
           )}
         </div>
 
-        {/* Right side */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
           {days !== null && (
             <span style={{ fontSize: 10, color: cfg.color, fontWeight: 500, whiteSpace: 'nowrap' }}>
@@ -121,13 +129,20 @@ export default function ContactCard({ contact, tags, onEdit, onDelete }) {
                 <div style={{ fontSize: 12, color: val ? 'var(--text)' : 'var(--text3)' }}>{val || '—'}</div>
               </div>
             ))}
-            {contact.notes && (
-              <div style={{ gridColumn: '1 / -1', borderTop: '0.5px solid var(--border)', paddingTop: 10, marginTop: 2 }}>
-                <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Notes</div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{contact.notes}</div>
-              </div>
-            )}
           </div>
+
+          {/* Three note sections */}
+          <NoteBlock label="Notes" content={contact.notes} />
+          <NoteBlock
+            label="Referral notes"
+            content={contact.referral_notes}
+            color="#EAF3DE"
+          />
+          <NoteBlock
+            label="Other notes"
+            content={contact.other_notes}
+            color="#E6F1FB"
+          />
         </div>
       )}
     </div>
