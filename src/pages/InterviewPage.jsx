@@ -99,6 +99,8 @@ function InterviewModal({ interview, onClose, onSaved }) {
   const [company, setCompany] = useState(interview?.company || '')
   const [role, setRole] = useState(interview?.role || '')
   const [appliedDate, setAppliedDate] = useState(interview?.applied_date || '')
+  const [h1bAsked, setH1bAsked] = useState(interview?.h1b_asked ?? null)
+  const [h1bRemarks, setH1bRemarks] = useState(interview?.h1b_remarks || '')
   const [totalRounds, setTotalRounds] = useState(interview?.total_rounds || 3)
   const [rounds, setRounds] = useState([])
   const [saving, setSaving] = useState(false)
@@ -154,6 +156,8 @@ function InterviewModal({ interview, onClose, onSaved }) {
       company: company.trim(),
       role: role || null,
       applied_date: appliedDate || null,
+      h1b_asked: h1bAsked,
+      h1b_remarks: h1bRemarks || null,
       total_rounds: parseInt(totalRounds),
       status,
       updated_at: new Date().toISOString(),
@@ -211,6 +215,33 @@ function InterviewModal({ interview, onClose, onSaved }) {
             <select value={totalRounds} onChange={e => setTotalRounds(parseInt(e.target.value))}>
               {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}
             </select>
+          </div>
+        </div>
+
+        {/* H1B Sponsorship */}
+        <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 14, marginTop: 4, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 10 }}>H1B Sponsorship</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            {[
+              { val: true,  label: 'Company does sponsor',     bg: '#EAF3DE', color: '#27500A', border: '#97C459' },
+              { val: false, label: 'Company does not sponsor', bg: '#FCEBEB', color: '#A32D2D', border: '#F09595' },
+            ].map(opt => (
+              <button
+                key={String(opt.val)}
+                type="button"
+                onClick={() => setH1bAsked(opt.val)}
+                style={{
+                  flex: 1, padding: '7px 8px', borderRadius: 'var(--radius)', fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                  background: h1bAsked === opt.val ? opt.bg : 'var(--surface2)',
+                  color: h1bAsked === opt.val ? opt.color : 'var(--text3)',
+                  border: h1bAsked === opt.val ? '1.5px solid ' + opt.border : '0.5px solid var(--border)',
+                }}
+              >{opt.label}</button>
+            ))}
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Sponsors H1Bhip remarks</label>
+            <input value={h1bRemarks} onChange={e => setH1bRemarks(e.target.value)} placeholder="e.g. HR said they sponsor but need to confirm with legal" />
           </div>
         </div>
 
@@ -381,6 +412,16 @@ function InterviewCard({ interview, onEdit, onReject, onOffer, onDelete, onReact
           </div>
           <div style={{ fontSize: 11, color: 'var(--text2)' }}>
             {interview.applied_date && <><i className='ti ti-calendar' style={{ fontSize: 10, marginRight: 3 }} />Applied {fmt(interview.applied_date)} &nbsp;·&nbsp;</>}
+          {interview.h1b_asked === true && (
+            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: '#EAF3DE', color: '#27500A', fontWeight: 500, marginRight: 4 }}>
+              <i className="ti ti-check" style={{ fontSize: 9 }} /> Sponsors H1B
+            </span>
+          )}
+          {interview.h1b_asked === false && (
+            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: '#FCEBEB', color: '#A32D2D', fontWeight: 500, marginRight: 4 }}>
+              <i className="ti ti-x" style={{ fontSize: 9 }} /> No H1B sponsorship
+            </span>
+          )}
           {interview.role && <>{interview.role} &nbsp;·&nbsp;</>}
             {doneCount} of {interview.total_rounds} round{interview.total_rounds !== 1 ? 's' : ''} complete
             {nextRoundIdx >= 0 && rounds[nextRoundIdx].round_name && (
@@ -476,6 +517,12 @@ function InterviewCard({ interview, onEdit, onReject, onOffer, onDelete, onReact
           })}
 
           {/* Rejection / Offer banner */}
+          {interview.h1b_remarks && (
+            <div style={{ marginTop: 6, padding: '6px 10px', background: 'var(--surface2)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text2)', display: 'flex', gap: 6 }}>
+              <i className="ti ti-id-badge" style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }} />
+              H1B: {interview.h1b_remarks}
+            </div>
+          )}
           {status === 'rejected' && (
             <div style={{ marginTop: 8, padding: '8px 12px', background: '#FCEBEB', borderRadius: 'var(--radius)', fontSize: 11, color: '#A32D2D', display: 'flex', gap: 6 }}>
               <i className="ti ti-info-circle" style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }} />
