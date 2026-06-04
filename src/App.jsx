@@ -12,6 +12,10 @@ function Sidebar() {
         Jay's Job Hunt
         <span>2026 MBA Search</span>
       </div>
+      <NavLink to="/interviews" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+        <i className="ti ti-briefcase" />
+        Interviews
+      </NavLink>
       <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
         <i className="ti ti-users" />
         Referral details
@@ -23,10 +27,6 @@ function Sidebar() {
       <NavLink to="/target-companies" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
         <i className="ti ti-target" />
         Target companies
-      </NavLink>
-      <NavLink to="/interviews" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
-        <i className="ti ti-briefcase" />
-        Interviews
       </NavLink>
       <NavLink to="/companies" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
         <i className="ti ti-building" />

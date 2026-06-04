@@ -98,6 +98,7 @@ function InterviewModal({ interview, onClose, onSaved }) {
   const isEdit = !!interview
   const [company, setCompany] = useState(interview?.company || '')
   const [role, setRole] = useState(interview?.role || '')
+  const [appliedDate, setAppliedDate] = useState(interview?.applied_date || '')
   const [totalRounds, setTotalRounds] = useState(interview?.total_rounds || 3)
   const [rounds, setRounds] = useState([])
   const [saving, setSaving] = useState(false)
@@ -115,7 +116,8 @@ function InterviewModal({ interview, onClose, onSaved }) {
   }, [])
 
   useEffect(() => {
-    if (isEdit) return
+    // Only sync rounds count AFTER initial load (not on mount)
+    if (rounds.length === 0) return
     const current = rounds.length
     if (totalRounds > current) {
       setRounds(prev => [...prev, ...Array.from({ length: totalRounds - current }, (_, i) => ({
@@ -151,6 +153,7 @@ function InterviewModal({ interview, onClose, onSaved }) {
     const payload = {
       company: company.trim(),
       role: role || null,
+      applied_date: appliedDate || null,
       total_rounds: parseInt(totalRounds),
       status,
       updated_at: new Date().toISOString(),
@@ -198,6 +201,10 @@ function InterviewModal({ interview, onClose, onSaved }) {
           <div className="form-group">
             <label>Role</label>
             <input value={role} onChange={e => setRole(e.target.value)} placeholder="Strategy Associate" />
+          </div>
+          <div className="form-group">
+            <label>Application date</label>
+            <input type="date" value={appliedDate} onChange={e => setAppliedDate(e.target.value)} />
           </div>
           <div className="form-group">
             <label>Number of rounds</label>
@@ -373,7 +380,8 @@ function InterviewCard({ interview, onEdit, onReject, onOffer, onDelete, onReact
             </span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text2)' }}>
-            {interview.role && <>{interview.role} &nbsp;·&nbsp;</>}
+            {interview.applied_date && <><i className='ti ti-calendar' style={{ fontSize: 10, marginRight: 3 }} />Applied {fmt(interview.applied_date)} &nbsp;·&nbsp;</>}
+          {interview.role && <>{interview.role} &nbsp;·&nbsp;</>}
             {doneCount} of {interview.total_rounds} round{interview.total_rounds !== 1 ? 's' : ''} complete
             {nextRoundIdx >= 0 && rounds[nextRoundIdx].round_name && (
               <> &nbsp;·&nbsp; Next: {rounds[nextRoundIdx].round_name}{rounds[nextRoundIdx].interview_date ? ' — ' + fmt(rounds[nextRoundIdx].interview_date) : ''}</>
