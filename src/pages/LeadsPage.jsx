@@ -8,6 +8,55 @@ function fmt(d) {
   try { return format(parseISO(d), 'MMM d, yyyy') } catch { return d }
 }
 
+function BouncedModal({ lead, onClose, onConfirm }) {
+  const [note, setNote] = useState('')
+  const QUICK = [
+    'Email does not exist',
+    'Inbox full / over quota',
+    'Domain not found',
+    'Email address changed',
+    'No response after multiple attempts',
+  ]
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 400 }}>
+        <div className="modal-title">Mark as bounced</div>
+        <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
+          <strong>{lead.name || lead.company}</strong> will be marked as bounced. Add a note about why.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+          {QUICK.map(q => (
+            <button
+              key={q}
+              className="btn btn-sm btn-ghost"
+              style={{ fontSize: 11, background: note === q ? '#FCEBEB' : 'none', color: note === q ? '#A32D2D' : 'var(--text2)', borderColor: note === q ? '#F09595' : 'var(--border)' }}
+              onClick={() => setNote(q)}
+            >{q}</button>
+          ))}
+        </div>
+        <div className="form-group">
+          <label>Bounce note</label>
+          <input
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="e.g. Email does not exist"
+          />
+        </div>
+        <div className="modal-actions">
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button
+            className="btn"
+            style={{ background: '#FCEBEB', color: '#A32D2D', borderColor: '#F09595' }}
+            onClick={() => onConfirm(note)}
+          >
+            <i className="ti ti-mail-off" style={{ fontSize: 12 }} /> Mark bounced
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LeadModal({ lead, onClose, onSaved }) {
   const [form, setForm] = useState(lead ? { ...lead } : {
     company: '', name: '', email: '', reached_out_date: '', last_contact: '', lead_status: 'cold', notes: ''
@@ -49,6 +98,7 @@ function LeadModal({ lead, onClose, onSaved }) {
             <select value={form.lead_status || 'cold'} onChange={e => set('lead_status', e.target.value)}>
               <option value="cold">Cold</option>
               <option value="warm">Warm</option>
+              <option value="bounced">Bounced</option>
             </select>
           </div>
           <div className="form-group"><label>Reached out</label><input type="date" value={form.reached_out_date || ''} onChange={e => set('reached_out_date', e.target.value)} /></div>
@@ -74,6 +124,7 @@ export default function LeadsPage() {
   const [editing, setEditing] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [promoting, setPromoting] = useState(null)
+  const [bouncing, setBouncing] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
 
   useEffect(() => { load() }, [])
@@ -88,6 +139,16 @@ export default function LeadsPage() {
   async function deleteLead(lead) {
     await supabase.from('cold_leads').delete().eq('id', lead.id)
     setDeleteConfirm(null)
+    load()
+  }
+
+  async function confirmBounced(lead, note) {
+    await supabase.from('cold_leads').update({
+      lead_status: 'bounced',
+      notes: note ? (lead.notes ? lead.notes + '\n' + note : note) : lead.notes,
+      updated_at: new Date().toISOString()
+    }).eq('id', lead.id)
+    setBouncing(null)
     load()
   }
 
@@ -118,6 +179,7 @@ export default function LeadsPage() {
     total: leads.length,
     cold: leads.filter(l => l.lead_status === 'cold').length,
     warm: leads.filter(l => l.lead_status === 'warm').length,
+    bounced: leads.filter(l => l.lead_status === 'bounced').length,
   }), [leads])
 
   const filtered = useMemo(() => {
@@ -138,8 +200,9 @@ export default function LeadsPage() {
   if (loading) return <div className="loading">Loading leads…</div>
 
   const STATUS = {
-    cold: { bg: '#E6F1FB', color: '#0C447C', border: '#378ADD', label: 'Cold' },
-    warm: { bg: '#FAEEDA', color: '#633806', border: '#EF9F27', label: 'Warm' },
+    cold:    { bg: '#E6F1FB', color: '#0C447C', border: '#378ADD', label: 'Cold' },
+    warm:    { bg: '#FAEEDA', color: '#633806', border: '#EF9F27', label: 'Warm' },
+    bounced: { bg: '#FCEBEB', color: '#A32D2D', border: '#E24B4A', label: 'Bounced' },
   }
 
   return (
@@ -160,11 +223,13 @@ export default function LeadsPage() {
         <div className="stat-card"><div className="stat-label">Total leads</div><div className="stat-value">{stats.total}</div></div>
         <div className="stat-card"><div className="stat-label">Cold</div><div className="stat-value info">{stats.cold}</div></div>
         <div className="stat-card"><div className="stat-label">Warm</div><div className="stat-value warning">{stats.warm}</div></div>
+        <div className="stat-card"><div className="stat-label">Bounced</div><div className="stat-value danger">{stats.bounced}</div></div>
       </div>
 
       <div className="insight">
         <i className="ti ti-bulb" style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }} />
-        {stats.cold} cold leads across {stats.companies} companies. When someone responds, click "Warm" — they'll be added to Referral details and stay here as warm.
+        {stats.cold} cold leads across {stats.companies} companies. Click "Warm" when someone responds, or "Bounced" if the email was undeliverable.
+        {stats.bounced > 0 && <span style={{ color: '#A32D2D', marginLeft: 6 }}>{stats.bounced} bounced.</span>}
       </div>
 
       {/* Filters */}
@@ -177,7 +242,7 @@ export default function LeadsPage() {
       </div>
       <div className="filter-bar" style={{ marginBottom: 16 }}>
         <div className="pill-group">
-          {[{ v: 'all', l: 'All' }, { v: 'cold', l: 'Cold' }, { v: 'warm', l: 'Warm' }].map(p => (
+          {[{ v: 'all', l: 'All' }, { v: 'cold', l: 'Cold' }, { v: 'warm', l: 'Warm' }, { v: 'bounced', l: 'Bounced' }].map(p => (
             <button key={p.v} className={`pill${filterStatus === p.v ? ' active' : ''}`} onClick={() => setFilterStatus(p.v)}>{p.l}</button>
           ))}
         </div>
@@ -207,6 +272,9 @@ export default function LeadsPage() {
                     {lead.lead_status === 'warm' && (
                       <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic' }}>· in Referral details</span>
                     )}
+                    {lead.lead_status === 'bounced' && (
+                      <span style={{ fontSize: 10, color: '#A32D2D', fontStyle: 'italic' }}>· email undeliverable</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text2)' }}>
                     <i className="ti ti-building" style={{ fontSize: 10, marginRight: 3 }} />{lead.company}
@@ -216,13 +284,22 @@ export default function LeadsPage() {
 
                 <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
                   {lead.lead_status === 'cold' && (
-                    <button
-                      className="btn btn-sm"
-                      style={{ background: '#FAEEDA', color: '#633806', borderColor: '#EF9F27', fontSize: 11 }}
-                      onClick={e => { e.stopPropagation(); setPromoting(lead) }}
-                    >
-                      <i className="ti ti-arrow-up-right" style={{ fontSize: 12 }} /> Warm
-                    </button>
+                    <>
+                      <button
+                        className="btn btn-sm"
+                        style={{ background: '#FAEEDA', color: '#633806', borderColor: '#EF9F27', fontSize: 11 }}
+                        onClick={e => { e.stopPropagation(); setPromoting(lead) }}
+                      >
+                        <i className="ti ti-arrow-up-right" style={{ fontSize: 12 }} /> Warm
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        style={{ background: '#FCEBEB', color: '#A32D2D', borderColor: '#F09595', fontSize: 11 }}
+                        onClick={e => { e.stopPropagation(); setBouncing(lead) }}
+                      >
+                        <i className="ti ti-mail-off" style={{ fontSize: 12 }} /> Bounced
+                      </button>
+                    </>
                   )}
                   <button className="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); setEditing(lead); setShowModal(true) }}>
                     <i className="ti ti-edit" style={{ fontSize: 13 }} />
@@ -274,6 +351,14 @@ export default function LeadsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {bouncing && (
+        <BouncedModal
+          lead={bouncing}
+          onClose={() => setBouncing(null)}
+          onConfirm={(note) => confirmBounced(bouncing, note)}
+        />
       )}
 
       {deleteConfirm && (
