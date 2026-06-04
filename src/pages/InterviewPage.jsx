@@ -245,6 +245,33 @@ function InterviewModal({ interview, onClose, onSaved }) {
           </div>
         </div>
 
+        {/* H1B Sponsorship — visible without scrolling */}
+        <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 10 }}>H1B Sponsorship</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            {[
+              { val: true,  label: 'Company does sponsor',     bg: '#EAF3DE', color: '#27500A', border: '#97C459' },
+              { val: false, label: 'Company does not sponsor', bg: '#FCEBEB', color: '#A32D2D', border: '#F09595' },
+            ].map(opt => (
+              <button
+                key={String(opt.val)}
+                type="button"
+                onClick={() => setH1bAsked(opt.val)}
+                style={{
+                  flex: 1, padding: '7px 8px', borderRadius: 'var(--radius)', fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                  background: h1bAsked === opt.val ? opt.bg : 'var(--surface2)',
+                  color: h1bAsked === opt.val ? opt.color : 'var(--text3)',
+                  border: h1bAsked === opt.val ? '1.5px solid ' + opt.border : '0.5px solid var(--border)',
+                }}
+              >{opt.label}</button>
+            ))}
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>H1B sponsorship remarks</label>
+            <input value={h1bRemarks} onChange={e => setH1bRemarks(e.target.value)} placeholder="e.g. Clarified that I can work on OPT" />
+          </div>
+        </div>
+
         <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 10 }}>
             Interview rounds — fill in as you go
