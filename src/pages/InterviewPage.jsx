@@ -382,8 +382,102 @@ function OfferModal({ interview, onClose, onSaved }) {
   )
 }
 
+
+// ── Interview to-do modal ──────────────────────────────────
+function TodoModal({ interview, onClose, onSaved }) {
+  const [todos, setTodos] = useState((interview.todos || []).map(t => ({ ...t })))
+  const [newTask, setNewTask] = useState('')
+  const [saving, setSaving] = useState(false)
+  const done = todos.filter(t => t.completed).length
+  const pct = todos.length ? Math.round((done / todos.length) * 100) : 0
+
+  function addTask() {
+    const title = newTask.trim()
+    if (!title) return
+    setTodos(prev => [...prev, { task: title, completed: false, position: prev.length + 1 }])
+    setNewTask('')
+  }
+
+  function toggleTask(idx) {
+    setTodos(prev => prev.map((t, i) => i === idx ? { ...t, completed: !t.completed } : t))
+  }
+
+  function updateTask(idx, task) {
+    setTodos(prev => prev.map((t, i) => i === idx ? { ...t, task } : t))
+  }
+
+  function removeTask(idx) {
+    setTodos(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  async function save() {
+    setSaving(true)
+    await supabase.from('interview_todos').delete().eq('interview_id', interview.id)
+    const clean = todos.map((t, i) => ({
+      interview_id: interview.id,
+      task: (t.task || '').trim(),
+      completed: !!t.completed,
+      position: i + 1,
+    })).filter(t => t.task)
+    if (clean.length) await supabase.from('interview_todos').insert(clean)
+    setSaving(false)
+    onSaved()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="modal-title">To-do — {interview.company}</div>
+        {interview.role && <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: -12, marginBottom: 14 }}>{interview.role}</div>}
+
+        <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 10, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+            <span style={{ color: 'var(--text2)' }}>Progress</span>
+            <strong>{done} of {todos.length} done</strong>
+          </div>
+          <div style={{ height: 5, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ width: pct + '%', height: '100%', background: '#7C3AED' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {todos.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', padding: 14 }}>No tasks yet. Add prep, follow-up, or email tasks below.</div>}
+          {todos.map((todo, idx) => (
+            <div key={todo.id || idx} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius)', padding: '8px 10px' }}>
+              <input type="checkbox" checked={!!todo.completed} onChange={() => toggleTask(idx)} />
+              <input
+                value={todo.task || ''}
+                onChange={e => updateTask(idx, e.target.value)}
+                style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none', opacity: todo.completed ? 0.65 : 1 }}
+              />
+              <button className="btn btn-ghost btn-sm" onClick={() => removeTask(idx)}><i className="ti ti-x" style={{ fontSize: 13 }} /></button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <input
+            className="search-input"
+            style={{ maxWidth: 'none', flex: 1 }}
+            value={newTask}
+            onChange={e => setNewTask(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addTask()}
+            placeholder="Add a task: prepare cases, send thank-you email..."
+          />
+          <button className="btn" onClick={addTask}><i className="ti ti-plus" /> Add</button>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save to-dos'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Interview card ──────────────────────────────────────────
-function InterviewCard({ interview, onEdit, onReject, onOffer, onDelete, onReactivate }) {
+function InterviewCard({ interview, onEdit, onReject, onOffer, onDelete, onReactivate, onTodo }) {
   const [expanded, setExpanded] = useState(true)
   const rounds = interview.rounds || []
   const status = interview.status || 'coming_up'
@@ -431,6 +525,13 @@ function InterviewCard({ interview, onEdit, onReject, onOffer, onDelete, onReact
           </div>
         </div>
         <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
+          <button
+            className="btn btn-sm"
+            style={{ background: (interview.todos || []).some(t => !t.completed) ? '#7C3AED' : 'transparent', color: (interview.todos || []).some(t => !t.completed) ? '#fff' : 'var(--text)', borderColor: (interview.todos || []).some(t => !t.completed) ? '#7C3AED' : 'var(--border-strong)', fontSize: 11 }}
+            onClick={e => { e.stopPropagation(); onTodo(interview) }}
+          >
+            <i className="ti ti-checklist" style={{ fontSize: 12 }} /> To-do{(interview.todos || []).filter(t => !t.completed).length ? ` (${(interview.todos || []).filter(t => !t.completed).length})` : ''}
+          </button>
           {!isTerminal && (
             <>
               <button
@@ -610,6 +711,7 @@ export default function InterviewPage() {
   const [rejectTarget, setRejectTarget] = useState(null)
   const [offerTarget, setOfferTarget] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [todoTarget, setTodoTarget] = useState(null)
   const [filterStatus, setFilterStatus] = useState('all')
   const [search, setSearch] = useState('')
 
@@ -619,9 +721,11 @@ export default function InterviewPage() {
     setLoading(true)
     const { data: ivs } = await supabase.from('interviews').select('*').order('created_at', { ascending: false })
     const { data: rounds } = await supabase.from('interview_rounds').select('*').order('round_number')
+    const { data: todos } = await supabase.from('interview_todos').select('*').order('position')
     const enriched = (ivs || []).map(iv => ({
       ...iv,
       rounds: (rounds || []).filter(r => r.interview_id === iv.id).sort((a, b) => a.round_number - b.round_number),
+      todos: (todos || []).filter(t => t.interview_id === iv.id).sort((a, b) => a.position - b.position),
     }))
     setInterviews(enriched)
     setLoading(false)
@@ -753,6 +857,7 @@ export default function InterviewPage() {
               onOffer={setOfferTarget}
               onDelete={setDeleteConfirm}
               onReactivate={reactivate}
+              onTodo={setTodoTarget}
             />
           ))}
         </>
@@ -809,6 +914,13 @@ export default function InterviewPage() {
           interview={offerTarget}
           onClose={() => setOfferTarget(null)}
           onSaved={() => { setOfferTarget(null); load() }}
+        />
+      )}
+      {todoTarget && (
+        <TodoModal
+          interview={todoTarget}
+          onClose={() => setTodoTarget(null)}
+          onSaved={() => { setTodoTarget(null); load() }}
         />
       )}
       {deleteConfirm && (
