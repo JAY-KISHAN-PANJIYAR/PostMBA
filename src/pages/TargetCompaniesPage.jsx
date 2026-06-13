@@ -183,7 +183,6 @@ function TargetCompanyCard({ company, verticals, onUpdate, onDelete, compact }) 
   if (compact) {
     return (
       <div
-        onClick={() => onDelete && null}
         style={{ padding: '8px 10px', border: cardBorder, background: cardBg, borderRadius: 'var(--radius)', marginBottom: 7, opacity: isDont ? 0.62 : 1 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
@@ -194,14 +193,25 @@ function TargetCompanyCard({ company, verticals, onUpdate, onDelete, compact }) 
             style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, border: 'none', cursor: 'pointer', padding: 0, background: PRIORITY_DOT[priority] }}
           />
           <span style={{ fontWeight: 600, fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</span>
-          {company.activeInterview && (
-            <i className="ti ti-briefcase" style={{ fontSize: 11, color: '#0C447C', flexShrink: 0 }} title="Active interview" />
-          )}
           <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text2)', flexShrink: 0 }}>
             {company.coContacts.length} · {company.secured.length} ref
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+
+        {/* interview status line */}
+        <div style={{ marginBottom: 6 }}>
+          {company.activeInterview ? (
+            <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 8, background: '#E6F1FB', color: '#0C447C', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <i className="ti ti-briefcase" style={{ fontSize: 10 }} /> Active interview
+            </span>
+          ) : (
+            <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--text3)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <i className="ti ti-briefcase" style={{ fontSize: 10 }} /> No interview
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
           <button
             onClick={() => update({ application_decision: 'apply' })}
             style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, cursor: 'pointer', fontWeight: 500, border: '0.5px solid ' + (isApply ? '#639922' : '#97C459'), background: isApply ? '#639922' : 'var(--surface)', color: isApply ? '#fff' : '#27500A' }}
@@ -217,6 +227,17 @@ function TargetCompanyCard({ company, verticals, onUpdate, onDelete, compact }) 
           <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', padding: '2px 5px' }} onClick={() => onDelete(company)}>
             <i className="ti ti-trash" style={{ fontSize: 12 }} />
           </button>
+        </div>
+
+        {/* last applied date */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text2)' }}>
+          <i className="ti ti-calendar" style={{ fontSize: 10 }} /> Applied
+          <input
+            type="date"
+            value={company.last_applied_date || ''}
+            onChange={e => update({ last_applied_date: e.target.value || null })}
+            style={{ fontSize: 10, padding: '2px 4px', height: 'auto', width: 'auto', flex: 1 }}
+          />
         </div>
       </div>
     )

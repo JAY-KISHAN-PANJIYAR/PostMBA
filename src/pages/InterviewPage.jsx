@@ -937,7 +937,7 @@ export default function InterviewPage() {
       {todoTarget && (
         <TodoModal
           interview={todoTarget}
-          onClose={() => setTodoTarget(null)}
+          onClose={() => { setTodoTarget(null); load() }}
           onSaved={() => { setTodoTarget(null); load() }}
         />
       )}
