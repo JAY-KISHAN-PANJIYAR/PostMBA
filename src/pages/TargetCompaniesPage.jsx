@@ -154,108 +154,128 @@ function AddCompanyModal({ existingCompanies, verticals, onClose, onSaved }) {
   )
 }
 
+const PRIORITY_CYCLE = ['high', 'medium', 'low']
+const PRIORITY_DOT = { high: '#E24B4A', medium: '#EF9F27', low: '#639922' }
+
 function TargetCompanyCard({ company, verticals, onUpdate, onDelete }) {
-  const pr = PRIORITY[company.priority] || PRIORITY.medium
-  const decision = DECISION[company.application_decision || 'apply'] || DECISION.apply
   const hasContacts = company.coContacts.length > 0
   const total = company.coContacts.length
   const securedPct = total > 0 ? Math.round((company.secured.length / total) * 100) : 0
+  const decision = company.application_decision || 'apply'
+  const isApply = decision === 'apply'
+  const isDont = decision === 'dont_apply_now'
+  const priority = company.priority || 'medium'
 
   async function update(fields) {
     await supabase.from('target_companies').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', company.id)
     onUpdate()
   }
 
+  function cyclePriority() {
+    const idx = PRIORITY_CYCLE.indexOf(priority)
+    const next = PRIORITY_CYCLE[(idx + 1) % PRIORITY_CYCLE.length]
+    update({ priority: next })
+  }
+
+  const cardBg = isApply ? '#EAF3DE' : 'var(--surface)'
+  const cardBorder = isApply ? '0.5px solid #97C459' : !hasContacts ? '0.5px solid #F09595' : '0.5px solid var(--border)'
+
   return (
-    <div className="card" style={{ padding: '13px 14px', border: !hasContacts ? '0.5px solid #F09595' : '0.5px solid var(--border)', marginBottom: 9 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 9 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
-            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{company.name}</span>
-            {company.activeInterview && (
-              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: '#E6F1FB', color: '#0C447C', fontWeight: 600 }}>
-                <i className="ti ti-briefcase" style={{ fontSize: 10 }} /> Active interview
-              </span>
-            )}
-            {!company.activeInterview && (
-              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'var(--surface2)', color: 'var(--text3)' }}>No interview</span>
-            )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: pr.bg, color: pr.color, fontWeight: 600 }}>{pr.label}</span>
-            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: decision.bg, color: decision.color, fontWeight: 600 }}>
-              <i className={'ti ' + decision.icon} style={{ fontSize: 10 }} /> {decision.label}
-            </span>
-            <span style={{ fontSize: 11, color: 'var(--text3)' }}>Last applied: {fmt(company.last_applied_date)}</span>
-          </div>
-        </div>
-        <button className="btn btn-ghost btn-sm" onClick={() => onDelete(company)}><i className="ti ti-trash" style={{ fontSize: 13 }} /></button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Vertical</label>
-          <select value={company.vertical_id || ''} onChange={e => update({ vertical_id: e.target.value || null })}>
-            <option value="">Unassigned</option>
-            {verticals.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Priority</label>
-          <select value={company.priority || 'medium'} onChange={e => update({ priority: e.target.value })}>
-            {Object.entries(PRIORITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Decision</label>
-          <select value={company.application_decision || 'apply'} onChange={e => update({ application_decision: e.target.value })}>
-            <option value="apply">Apply</option>
-            <option value="dont_apply_now">Don't apply now</option>
-          </select>
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Last applied date</label>
-          <input type="date" value={company.last_applied_date || ''} onChange={e => update({ last_applied_date: e.target.value || null })} />
+    <div className="card" style={{ padding: '10px 12px', border: cardBorder, background: cardBg, marginBottom: 8, opacity: isDont ? 0.62 : 1 }}>
+      {/* Row 1: priority dot + name + vertical + interview + delete */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
+        <button
+          onClick={cyclePriority}
+          title={'Priority: ' + priority + ' (click to change)'}
+          aria-label={'Priority ' + priority}
+          style={{ width: 11, height: 11, borderRadius: '50%', flexShrink: 0, border: 'none', cursor: 'pointer', padding: 0, background: PRIORITY_DOT[priority] }}
+        />
+        <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</span>
+        {company.vertical && (
+          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 9, background: '#EEEDFE', color: '#3C3489', fontWeight: 500, flexShrink: 0 }}>{company.vertical.name}</span>
+        )}
+        {company.activeInterview ? (
+          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 9, background: '#E6F1FB', color: '#0C447C', fontWeight: 500, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <i className="ti ti-briefcase" style={{ fontSize: 10 }} /> Active interview
+          </span>
+        ) : (
+          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 9, background: 'var(--surface2)', color: 'var(--text3)', flexShrink: 0 }}>No interview</span>
+        )}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: 'var(--text2)' }}><b style={{ color: 'var(--text)', fontWeight: 600 }}>{total}</b> contact{total !== 1 ? 's' : ''}</span>
+          <span style={{ fontSize: 11, color: 'var(--text2)' }}><b style={{ color: company.secured.length > 0 ? '#27500A' : 'var(--text)', fontWeight: 600 }}>{company.secured.length}</b> ref</span>
+          <button className="btn btn-ghost btn-sm" style={{ padding: '2px 5px' }} onClick={() => onDelete(company)}><i className="ti ti-trash" style={{ fontSize: 13 }} /></button>
         </div>
       </div>
 
-      {company.notes && <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 10, fontStyle: 'italic' }}>{company.notes}</div>}
+      {/* Row 2: shrunk inline controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <select
+          value={company.vertical_id || ''}
+          onChange={e => update({ vertical_id: e.target.value || null })}
+          style={{ fontSize: 11, padding: '3px 6px', height: 'auto', width: 'auto', maxWidth: 130 }}
+        >
+          <option value="">Unassigned</option>
+          {verticals.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+        </select>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 8 }}>
-        <MiniMetric label="Contacts" value={total} danger={total === 0} />
-        <MiniMetric label="Active" value={company.active.length} />
-        <MiniMetric label="Referrals" value={company.secured.length} success={company.secured.length > 0} />
-        <MiniMetric label="Advocates" value={company.advocates.length} success={company.advocates.length > 0} />
+        {/* Apply / Don't apply toggle */}
+        <button
+          onClick={() => update({ application_decision: 'apply' })}
+          style={{
+            fontSize: 11, padding: '3px 9px', borderRadius: 'var(--radius)', cursor: 'pointer', fontWeight: 500,
+            border: '0.5px solid ' + (isApply ? '#639922' : '#97C459'),
+            background: isApply ? '#639922' : 'var(--surface)',
+            color: isApply ? '#fff' : '#27500A',
+          }}
+        >
+          <i className="ti ti-check" style={{ fontSize: 11 }} /> Apply
+        </button>
+        <button
+          onClick={() => update({ application_decision: 'dont_apply_now' })}
+          style={{
+            fontSize: 11, padding: '3px 9px', borderRadius: 'var(--radius)', cursor: 'pointer', fontWeight: 500,
+            border: '0.5px solid ' + (isDont ? '#888780' : 'var(--border)'),
+            background: isDont ? '#888780' : 'var(--surface)',
+            color: isDont ? '#fff' : 'var(--text2)',
+          }}
+        >
+          <i className="ti ti-x" style={{ fontSize: 11 }} /> Don't apply
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto', fontSize: 11, color: 'var(--text2)' }}>
+          <i className="ti ti-calendar" style={{ fontSize: 11 }} />
+          <input
+            type="date"
+            value={company.last_applied_date || ''}
+            onChange={e => update({ last_applied_date: e.target.value || null })}
+            style={{ fontSize: 11, padding: '3px 5px', height: 'auto', width: 'auto' }}
+          />
+        </div>
       </div>
 
+      {company.notes && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 7, fontStyle: 'italic' }}>{company.notes}</div>}
+
+      {/* Contact chips / coverage */}
       {total > 0 ? (
-        <div>
-          <div style={{ height: 4, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+        <div style={{ marginTop: 8 }}>
+          <div style={{ height: 3, background: 'var(--surface2)', borderRadius: 4, overflow: 'hidden', marginBottom: 7 }}>
             <div style={{ width: securedPct + '%', height: '100%', background: securedPct > 0 ? '#639922' : 'var(--border)' }} />
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
             {company.coContacts.slice(0, 3).map(c => (
-              <span key={c.id} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'var(--surface2)', color: 'var(--text2)' }}>
-                {c.name || 'Unnamed'}{c.referral_status ? ` · ${c.referral_status}` : ''}
+              <span key={c.id} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: isApply ? 'rgba(255,255,255,0.6)' : 'var(--surface2)', color: 'var(--text2)' }}>
+                {c.name || 'Unnamed'}{c.referral_status ? ' · ' + c.referral_status : ''}
               </span>
             ))}
             {company.coContacts.length > 3 && <span style={{ fontSize: 10, color: 'var(--text3)' }}>+{company.coContacts.length - 3} more</span>}
           </div>
         </div>
       ) : (
-        <div style={{ fontSize: 11, color: '#A32D2D', display: 'flex', gap: 5, alignItems: 'center' }}>
+        <div style={{ fontSize: 11, color: '#A32D2D', display: 'flex', gap: 5, alignItems: 'center', marginTop: 8 }}>
           <i className="ti ti-alert-triangle" style={{ fontSize: 12 }} /> No referral coverage yet
         </div>
       )}
-    </div>
-  )
-}
-
-function MiniMetric({ label, value, danger, success }) {
-  return (
-    <div style={{ background: 'var(--surface2)', borderRadius: 8, padding: '7px 8px' }}>
-      <div style={{ fontSize: 10, color: 'var(--text3)' }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: danger ? '#A32D2D' : success ? '#27500A' : 'var(--text)' }}>{value}</div>
     </div>
   )
 }
@@ -400,7 +420,7 @@ export default function TargetCompaniesPage() {
       {view === 'kanban' && (
         <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', overflowX: 'auto', paddingBottom: 10 }}>
           {kanbanColumns.map(col => (
-            <div key={col.id} style={{ minWidth: 320, width: 320, background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            <div key={col.id} style={{ minWidth: 300, width: 300, background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '2px solid #378ADD' }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{col.name}</span>
                 <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: '#E6F1FB', color: '#0C447C', fontWeight: 600 }}>{col.cards.length}</span>

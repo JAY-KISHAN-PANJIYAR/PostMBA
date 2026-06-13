@@ -651,12 +651,14 @@ function InterviewCard({ interview, onEdit, onReject, onOffer, onDelete, onReact
 }
 
 // ── Kanban card ─────────────────────────────────────────────
-function KanbanCard({ interview, onEdit }) {
+function KanbanCard({ interview, onEdit, onTodo }) {
   const rounds = interview.rounds || []
   const doneCount = rounds.filter(r => r.completed).length
   const pct = interview.total_rounds > 0 ? Math.round((doneCount / interview.total_rounds) * 100) : 0
   const nextRound = rounds.find((r, i) => !r.completed && (i === 0 || rounds[i-1].completed))
   const status = interview.status
+  const todos = interview.todos || []
+  const pendingTodos = todos.filter(t => !t.completed).length
 
   return (
     <div
@@ -666,7 +668,21 @@ function KanbanCard({ interview, onEdit }) {
         padding: '10px 12px', marginBottom: 7, cursor: 'pointer',
       }}
     >
-      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{interview.company}</div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
+        <div style={{ fontWeight: 600, fontSize: 13 }}>{interview.company}</div>
+        <button
+          onClick={e => { e.stopPropagation(); onTodo(interview) }}
+          style={{
+            flexShrink: 0, fontSize: 10, padding: '2px 7px', borderRadius: 8, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 500,
+            border: '0.5px solid ' + (pendingTodos ? '#7C3AED' : 'var(--border-strong)'),
+            background: pendingTodos ? '#7C3AED' : 'var(--surface)',
+            color: pendingTodos ? '#fff' : 'var(--text2)',
+          }}
+        >
+          <i className="ti ti-checklist" style={{ fontSize: 11 }} /> To-do{pendingTodos ? ' (' + pendingTodos + ')' : ''}
+        </button>
+      </div>
       {interview.role && <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 5 }}>{interview.role} · {interview.total_rounds} rounds</div>}
       {status === 'coming_up' && nextRound?.interview_date && (
         <div style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: '#FAEEDA', color: '#633806', display: 'inline-block', marginBottom: 4 }}>
@@ -886,7 +902,7 @@ export default function InterviewPage() {
                 </div>
                 <div style={{ padding: 8 }}>
                   {cards.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', padding: '12px 8px', textAlign: 'center' }}>Empty</div>}
-                  {cards.map(iv => <KanbanCard key={iv.id} interview={iv} onEdit={openEdit} />)}
+                  {cards.map(iv => <KanbanCard key={iv.id} interview={iv} onEdit={openEdit} onTodo={setTodoTarget} />)}
                 </div>
               </div>
             )
