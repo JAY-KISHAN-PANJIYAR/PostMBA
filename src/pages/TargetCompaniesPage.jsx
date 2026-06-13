@@ -157,7 +157,7 @@ function AddCompanyModal({ existingCompanies, verticals, onClose, onSaved }) {
 const PRIORITY_CYCLE = ['high', 'medium', 'low']
 const PRIORITY_DOT = { high: '#E24B4A', medium: '#EF9F27', low: '#639922' }
 
-function TargetCompanyCard({ company, verticals, onUpdate, onDelete }) {
+function TargetCompanyCard({ company, verticals, onUpdate, onDelete, compact }) {
   const hasContacts = company.coContacts.length > 0
   const total = company.coContacts.length
   const securedPct = total > 0 ? Math.round((company.secured.length / total) * 100) : 0
@@ -180,6 +180,48 @@ function TargetCompanyCard({ company, verticals, onUpdate, onDelete }) {
   const cardBg = isApply ? '#EAF3DE' : 'var(--surface)'
   const cardBorder = isApply ? '0.5px solid #97C459' : !hasContacts ? '0.5px solid #F09595' : '0.5px solid var(--border)'
 
+  if (compact) {
+    return (
+      <div
+        onClick={() => onDelete && null}
+        style={{ padding: '8px 10px', border: cardBorder, background: cardBg, borderRadius: 'var(--radius)', marginBottom: 7, opacity: isDont ? 0.62 : 1 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+          <button
+            onClick={cyclePriority}
+            title={'Priority: ' + priority}
+            aria-label={'Priority ' + priority}
+            style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, border: 'none', cursor: 'pointer', padding: 0, background: PRIORITY_DOT[priority] }}
+          />
+          <span style={{ fontWeight: 600, fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</span>
+          {company.activeInterview && (
+            <i className="ti ti-briefcase" style={{ fontSize: 11, color: '#0C447C', flexShrink: 0 }} title="Active interview" />
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text2)', flexShrink: 0 }}>
+            {company.coContacts.length} · {company.secured.length} ref
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <button
+            onClick={() => update({ application_decision: 'apply' })}
+            style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, cursor: 'pointer', fontWeight: 500, border: '0.5px solid ' + (isApply ? '#639922' : '#97C459'), background: isApply ? '#639922' : 'var(--surface)', color: isApply ? '#fff' : '#27500A' }}
+          >
+            <i className="ti ti-check" style={{ fontSize: 10 }} /> Apply
+          </button>
+          <button
+            onClick={() => update({ application_decision: 'dont_apply_now' })}
+            style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, cursor: 'pointer', fontWeight: 500, border: '0.5px solid ' + (isDont ? '#888780' : 'var(--border)'), background: isDont ? '#888780' : 'var(--surface)', color: isDont ? '#fff' : 'var(--text2)' }}
+          >
+            Don't
+          </button>
+          <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', padding: '2px 5px' }} onClick={() => onDelete(company)}>
+            <i className="ti ti-trash" style={{ fontSize: 12 }} />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="card" style={{ padding: '10px 12px', border: cardBorder, background: cardBg, marginBottom: 8, opacity: isDont ? 0.62 : 1 }}>
       {/* Row 1: priority dot + name + vertical + interview + delete */}
@@ -188,8 +230,17 @@ function TargetCompanyCard({ company, verticals, onUpdate, onDelete }) {
           onClick={cyclePriority}
           title={'Priority: ' + priority + ' (click to change)'}
           aria-label={'Priority ' + priority}
-          style={{ width: 11, height: 11, borderRadius: '50%', flexShrink: 0, border: 'none', cursor: 'pointer', padding: 0, background: PRIORITY_DOT[priority] }}
-        />
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+            padding: '2px 8px 2px 6px', borderRadius: 10, cursor: 'pointer',
+            border: '0.5px solid ' + PRIORITY_DOT[priority],
+            background: 'transparent',
+            fontSize: 10, fontWeight: 600, color: PRIORITY_DOT[priority], textTransform: 'capitalize',
+          }}
+        >
+          <span style={{ width: 9, height: 9, borderRadius: '50%', background: PRIORITY_DOT[priority] }} />
+          {priority}
+        </button>
         <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</span>
         {company.vertical && (
           <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 9, background: '#EEEDFE', color: '#3C3489', fontWeight: 500, flexShrink: 0 }}>{company.vertical.name}</span>
@@ -294,6 +345,7 @@ export default function TargetCompaniesPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [newVertical, setNewVertical] = useState('')
   const [creatingVertical, setCreatingVertical] = useState(false)
+  const [showVerticalModal, setShowVerticalModal] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -321,6 +373,7 @@ export default function TargetCompaniesPage() {
     await supabase.from('company_verticals').upsert({ name }, { onConflict: 'name' })
     setNewVertical('')
     setCreatingVertical(false)
+    setShowVerticalModal(false)
     load()
   }
 
@@ -388,6 +441,7 @@ export default function TargetCompaniesPage() {
               </button>
             ))}
           </div>
+          <button className="btn" onClick={() => setShowVerticalModal(true)}><i className="ti ti-plus" /> Add vertical</button>
           <button className="btn btn-primary" onClick={() => setShowModal(true)}><i className="ti ti-plus" /> Add company</button>
         </div>
       </div>
@@ -420,26 +474,18 @@ export default function TargetCompaniesPage() {
       {view === 'kanban' && (
         <div style={{ display: 'flex', gap: 12, alignItems: 'stretch', overflowX: 'auto', paddingBottom: 10 }}>
           {kanbanColumns.map(col => (
-            <div key={col.id} style={{ minWidth: 300, width: 300, background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            <div key={col.id} style={{ minWidth: 240, width: 240, background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '2px solid #378ADD' }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{col.name}</span>
                 <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: '#E6F1FB', color: '#0C447C', fontWeight: 600 }}>{col.cards.length}</span>
               </div>
               <div style={{ padding: 8, minHeight: 120 }}>
                 {col.cards.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', padding: '12px 8px', textAlign: 'center' }}>No companies here yet</div>}
-                {col.cards.map(e => <TargetCompanyCard key={e.id} company={e} verticals={verticals} onUpdate={load} onDelete={setDeleteConfirm} />)}
+                {col.cards.map(e => <TargetCompanyCard key={e.id} company={e} verticals={verticals} onUpdate={load} onDelete={setDeleteConfirm} compact />)}
               </div>
             </div>
           ))}
 
-          <div style={{ minWidth: 260, width: 260, border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-lg)', padding: 14, background: 'var(--surface)' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}><i className="ti ti-plus" style={{ fontSize: 14 }} /> Add vertical</div>
-            <div className="form-group" style={{ marginBottom: 10 }}>
-              <label>New vertical name</label>
-              <input value={newVertical} onChange={e => setNewVertical(e.target.value)} placeholder="e.g. Tech" onKeyDown={e => e.key === 'Enter' && createVertical()} />
-            </div>
-            <button className="btn btn-primary" onClick={createVertical} disabled={creatingVertical}>{creatingVertical ? 'Adding…' : 'Create vertical'}</button>
-          </div>
         </div>
       )}
 
@@ -451,6 +497,22 @@ export default function TargetCompaniesPage() {
       )}
 
       {showModal && <AddCompanyModal existingCompanies={existingCompanies} verticals={verticals} onClose={() => setShowModal(false)} onSaved={() => { setShowModal(false); load() }} />}
+      {showVerticalModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowVerticalModal(false)}>
+          <div className="modal" style={{ maxWidth: 380 }}>
+            <div className="modal-title">Add vertical</div>
+            <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>Create a new category column like Tech, Healthcare, or Retail.</p>
+            <div className="form-group">
+              <label>Vertical name</label>
+              <input autoFocus value={newVertical} onChange={e => setNewVertical(e.target.value)} placeholder="e.g. Tech" onKeyDown={e => e.key === 'Enter' && createVertical()} />
+            </div>
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setShowVerticalModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={createVertical} disabled={creatingVertical}>{creatingVertical ? 'Adding…' : 'Create vertical'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>

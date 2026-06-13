@@ -387,41 +387,43 @@ function OfferModal({ interview, onClose, onSaved }) {
 function TodoModal({ interview, onClose, onSaved }) {
   const [todos, setTodos] = useState((interview.todos || []).map(t => ({ ...t })))
   const [newTask, setNewTask] = useState('')
-  const [saving, setSaving] = useState(false)
   const done = todos.filter(t => t.completed).length
   const pct = todos.length ? Math.round((done / todos.length) * 100) : 0
 
-  function addTask() {
+  async function addTask() {
     const title = newTask.trim()
     if (!title) return
-    setTodos(prev => [...prev, { task: title, completed: false, position: prev.length + 1 }])
+    const position = todos.length + 1
     setNewTask('')
+    const { data } = await supabase.from('interview_todos').insert({
+      interview_id: interview.id,
+      task: title,
+      completed: false,
+      position,
+    }).select().single()
+    if (data) setTodos(prev => [...prev, data])
   }
 
-  function toggleTask(idx) {
-    setTodos(prev => prev.map((t, i) => i === idx ? { ...t, completed: !t.completed } : t))
+  async function toggleTask(idx) {
+    const t = todos[idx]
+    const next = !t.completed
+    setTodos(prev => prev.map((x, i) => i === idx ? { ...x, completed: next } : x))
+    if (t.id) await supabase.from('interview_todos').update({ completed: next }).eq('id', t.id)
   }
 
-  function updateTask(idx, task) {
+  async function updateTask(idx, task) {
     setTodos(prev => prev.map((t, i) => i === idx ? { ...t, task } : t))
   }
 
-  function removeTask(idx) {
-    setTodos(prev => prev.filter((_, i) => i !== idx))
+  async function saveTaskText(idx) {
+    const t = todos[idx]
+    if (t.id) await supabase.from('interview_todos').update({ task: (t.task || '').trim() }).eq('id', t.id)
   }
 
-  async function save() {
-    setSaving(true)
-    await supabase.from('interview_todos').delete().eq('interview_id', interview.id)
-    const clean = todos.map((t, i) => ({
-      interview_id: interview.id,
-      task: (t.task || '').trim(),
-      completed: !!t.completed,
-      position: i + 1,
-    })).filter(t => t.task)
-    if (clean.length) await supabase.from('interview_todos').insert(clean)
-    setSaving(false)
-    onSaved()
+  async function removeTask(idx) {
+    const t = todos[idx]
+    setTodos(prev => prev.filter((_, i) => i !== idx))
+    if (t.id) await supabase.from('interview_todos').delete().eq('id', t.id)
   }
 
   return (
@@ -448,6 +450,7 @@ function TodoModal({ interview, onClose, onSaved }) {
               <input
                 value={todo.task || ''}
                 onChange={e => updateTask(idx, e.target.value)}
+                onBlur={() => saveTaskText(idx)}
                 style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none', opacity: todo.completed ? 0.65 : 1 }}
               />
               <button className="btn btn-ghost btn-sm" onClick={() => removeTask(idx)}><i className="ti ti-x" style={{ fontSize: 13 }} /></button>
@@ -468,8 +471,7 @@ function TodoModal({ interview, onClose, onSaved }) {
         </div>
 
         <div className="modal-actions">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save to-dos'}</button>
+          <button className="btn btn-primary" onClick={onClose}>Done</button>
         </div>
       </div>
     </div>
