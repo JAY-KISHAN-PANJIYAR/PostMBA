@@ -166,9 +166,28 @@ function TargetCompanyCard({ company, verticals, onUpdate, onDelete, compact }) 
   const isDont = decision === 'dont_apply_now'
   const priority = company.priority || 'medium'
 
+  const [noteText, setNoteText] = useState(company.notes || '')
+  const [noteDirty, setNoteDirty] = useState(false)
+
   async function update(fields) {
     await supabase.from('target_companies').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', company.id)
     onUpdate()
+  }
+
+  async function saveNote() {
+    if (!noteDirty) return
+    setNoteDirty(false)
+    await supabase.from('target_companies').update({
+      notes: noteText || null,
+      notes_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', company.id)
+    onUpdate()
+  }
+
+  function noteUpdatedLabel() {
+    if (!company.notes_updated_at) return null
+    try { return 'Updated ' + format(parseISO(company.notes_updated_at), 'MMM d, yyyy') } catch { return null }
   }
 
   function cyclePriority() {
@@ -238,6 +257,22 @@ function TargetCompanyCard({ company, verticals, onUpdate, onDelete, compact }) 
             onChange={e => update({ last_applied_date: e.target.value || null })}
             style={{ fontSize: 10, padding: '2px 4px', height: 'auto', width: 'auto', flex: 1 }}
           />
+        </div>
+
+        {/* notes */}
+        <div style={{ marginTop: 6 }}>
+          <textarea
+            value={noteText}
+            onChange={e => { setNoteText(e.target.value); setNoteDirty(true) }}
+            onBlur={saveNote}
+            rows={2}
+            placeholder="Notes — company info, role, status..."
+            style={{ width: '100%', fontSize: 10, padding: '5px 7px', borderRadius: 6, border: '0.5px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', resize: 'vertical', fontFamily: 'inherit' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, minHeight: 14 }}>
+            <span style={{ fontSize: 9, color: 'var(--text3)' }}>{noteUpdatedLabel()}</span>
+            {noteDirty && <span style={{ fontSize: 9, color: '#EF9F27' }}>Unsaved — click away to save</span>}
+          </div>
         </div>
       </div>
     )
