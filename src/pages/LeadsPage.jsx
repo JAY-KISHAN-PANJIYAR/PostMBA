@@ -59,7 +59,7 @@ function BouncedModal({ lead, onClose, onConfirm }) {
 
 function LeadModal({ lead, onClose, onSaved }) {
   const [form, setForm] = useState(lead ? { ...lead } : {
-    company: '', name: '', email: '', reached_out_date: '', last_contact: '', lead_status: 'cold', notes: ''
+    company: '', name: '', email: '', lead_added_date: '', reached_out_date: '', last_contact: '', lead_status: 'cold', notes: ''
   })
   const [saving, setSaving] = useState(false)
   function set(f, v) { setForm(p => ({ ...p, [f]: v })) }
@@ -72,6 +72,7 @@ function LeadModal({ lead, onClose, onSaved }) {
       name: form.name || null,
       email: form.email || null,
       reached_out_date: form.reached_out_date || null,
+      lead_added_date: form.lead_added_date || null,
       last_contact: form.last_contact || null,
       lead_status: form.lead_status || 'cold',
       notes: form.notes || null,
@@ -101,6 +102,7 @@ function LeadModal({ lead, onClose, onSaved }) {
               <option value="bounced">Bounced</option>
             </select>
           </div>
+          <div className="form-group"><label>Lead added</label><input type="date" value={form.lead_added_date || ''} onChange={e => set('lead_added_date', e.target.value)} /></div>
           <div className="form-group"><label>Reached out</label><input type="date" value={form.reached_out_date || ''} onChange={e => set('reached_out_date', e.target.value)} /></div>
           <div className="form-group"><label>Last contact</label><input type="date" value={form.last_contact || ''} onChange={e => set('last_contact', e.target.value)} /></div>
           <div className="form-group full"><label>Notes</label><textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} rows={3} placeholder="Context, email sent, response…" /></div>
@@ -269,6 +271,16 @@ export default function LeadsPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{lead.name || '—'}</span>
                     <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: sc.bg, color: sc.color, fontWeight: 500 }}>{sc.label}</span>
+                    {lead.lead_added_date && (
+                      <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'var(--surface2)', color: 'var(--text2)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <i className="ti ti-user-plus" style={{ fontSize: 10 }} /> Added {fmt(lead.lead_added_date)}
+                      </span>
+                    )}
+                    {lead.reached_out_date && (
+                      <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'var(--surface2)', color: 'var(--text2)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <i className="ti ti-send" style={{ fontSize: 10 }} /> Reached out {fmt(lead.reached_out_date)}
+                      </span>
+                    )}
                     {lead.lead_status === 'warm' && (
                       <span style={{ fontSize: 10, color: 'var(--text3)', fontStyle: 'italic' }}>· in Referral details</span>
                     )}
