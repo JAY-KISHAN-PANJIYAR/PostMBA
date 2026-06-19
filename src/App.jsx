@@ -4,6 +4,7 @@ import CompaniesPage from './pages/CompaniesPage.jsx'
 import LeadsPage from './pages/LeadsPage.jsx'
 import TargetCompaniesPage from './pages/TargetCompaniesPage.jsx'
 import InterviewPage from './pages/InterviewPage.jsx'
+import ActivityPage from './pages/ActivityPage.jsx'
 
 function Sidebar() {
   return (
@@ -15,6 +16,10 @@ function Sidebar() {
       <NavLink to="/interviews" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
         <i className="ti ti-briefcase" />
         Interviews
+      </NavLink>
+      <NavLink to="/activity" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+        <i className="ti ti-activity" />
+        Activity
       </NavLink>
       <NavLink to="/" end className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
         <i className="ti ti-users" />
@@ -47,6 +52,7 @@ export default function App() {
             <Route path="/leads" element={<LeadsPage />} />
             <Route path="/target-companies" element={<TargetCompaniesPage />} />
             <Route path="/interviews" element={<InterviewPage />} />
+            <Route path="/activity" element={<ActivityPage />} />
             <Route path="/companies" element={<CompaniesPage />} />
           </Routes>
         </main>
