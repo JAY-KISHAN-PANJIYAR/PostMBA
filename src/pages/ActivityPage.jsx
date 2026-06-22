@@ -93,6 +93,7 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState(90)
   const [selectedDay, setSelectedDay] = useState(null)
+  const [selectedIvDay, setSelectedIvDay] = useState(null)
   const [editingReferrals, setEditingReferrals] = useState(false)
   const [referralInput, setReferralInput] = useState('')
   const [saving, setSaving] = useState(false)
@@ -107,8 +108,8 @@ export default function ActivityPage() {
       supabase.from('cold_leads').select('lead_added_date, reached_out_date, name, company').order('lead_added_date'),
       supabase.from('contacts').select('name, company, last_contact').order('last_contact'),
       supabase.from('daily_activity').select('*'),
-      supabase.from('interviews').select('company, role, applied_date, status'),
-      supabase.from('interview_rounds').select('interview_id, round_name, interview_date, completed'),
+      supabase.from('interviews').select('id, company, role, applied_date, status, total_rounds'),
+      supabase.from('interview_rounds').select('id, interview_id, round_name, round_number, interview_date, completed'),
     ])
     setLeads(l || [])
     setContacts(c || [])
@@ -153,6 +154,13 @@ export default function ActivityPage() {
     return map
   }, [leads, contacts, manualActivity])
 
+  // Build lookup: interview id -> interview
+  const interviewById = useMemo(() => {
+    const m = {}
+    for (const iv of interviews) m[iv.id] = iv
+    return m
+  }, [interviews])
+
   // Interview heatmap — applied dates + round dates
   const interviewDayMap = useMemo(() => {
     const map = {}
@@ -167,12 +175,13 @@ export default function ActivityPage() {
       if (r.interview_date) {
         const k = r.interview_date.slice(0, 10)
         if (!map[k]) map[k] = { applied: [], scheduled: [], done: [] }
-        if (r.completed) map[k].done.push(r)
-        else map[k].scheduled.push(r)
+        const enriched = { ...r, interview: interviewById[r.interview_id] }
+        if (r.completed) map[k].done.push(enriched)
+        else map[k].scheduled.push(enriched)
       }
     }
     return map
-  }, [interviews, interviewRounds])
+  }, [interviews, interviewRounds, interviewById])
 
   function ivDayTotal(k) {
     const d = interviewDayMap[k]
@@ -349,26 +358,79 @@ export default function ActivityPage() {
           if (d.applied.length > 0) return { bg: '#378ADD', label: 'Applied' }
           return { bg: null, label: null }
         }}
-        selectedDay={null}
-        onSelectDay={() => {}}
+        selectedDay={selectedIvDay}
+        onSelectDay={(k) => setSelectedIvDay(selectedIvDay === k ? null : k)}
         legend={[
           { color: '#378ADD', label: 'Applied' },
           { color: '#EF9F27', label: 'Round scheduled' },
           { color: '#639922', label: 'Round completed' },
         ]}
         footer={
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 10 }}>
-            {interviews.map(iv => (
-              <div key={iv.company + iv.role} style={{ fontSize: 11, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  background: iv.status === 'ongoing' ? '#378ADD' : iv.status === 'coming_up' ? '#EF9F27' : iv.status === 'offer_received' ? '#639922' : '#E24B4A',
-                }} />
-                <strong style={{ color: 'var(--text)' }}>{iv.company}</strong>
-                {iv.role && <span>· {iv.role.length > 28 ? iv.role.slice(0, 28) + '…' : iv.role}</span>}
-              </div>
-            ))}
-            {interviews.length === 0 && <span style={{ fontSize: 11, color: 'var(--text3)' }}>No interviews logged yet.</span>}
+          <div>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 10, borderTop: '0.5px solid var(--color-border-tertiary)', paddingTop: 10 }}>
+              {interviews.map(iv => (
+                <div key={iv.id} style={{ fontSize: 11, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: iv.status === 'ongoing' ? '#378ADD' : iv.status === 'coming_up' ? '#EF9F27' : iv.status === 'offer_received' ? '#639922' : '#E24B4A',
+                  }} />
+                  <strong style={{ color: 'var(--text)' }}>{iv.company}</strong>
+                  {iv.applied_date && <span style={{ color: 'var(--color-text-tertiary)' }}>· applied {fmt(iv.applied_date)}</span>}
+                </div>
+              ))}
+              {interviews.length === 0 && <span style={{ fontSize: 11, color: 'var(--text3)' }}>No interviews logged yet.</span>}
+            </div>
+            {selectedIvDay && (() => {
+              const d = interviewDayMap[selectedIvDay]
+              if (!d) return null
+              return (
+                <div style={{ marginTop: 10, padding: '12px 14px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-lg)', border: '0.5px solid var(--color-border-tertiary)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span><i className="ti ti-calendar-event" style={{ marginRight: 6, fontSize: 13 }} />{fmt(selectedIvDay)}</span>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIvDay(null)}><i className="ti ti-x" style={{ fontSize: 12 }} /></button>
+                  </div>
+                  {d.applied.length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: '#0C447C', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 2, background: '#378ADD', display: 'inline-block' }} /> Applied
+                      </div>
+                      {d.applied.map(iv => (
+                        <div key={iv.id} style={{ fontSize: 12, padding: '5px 8px', background: 'var(--color-background-primary)', borderRadius: 6, marginBottom: 4 }}>
+                          <strong>{iv.company}</strong>{iv.role && <span style={{ color: 'var(--color-text-secondary)' }}> · {iv.role}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {d.scheduled.length > 0 && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: '#633806', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 2, background: '#EF9F27', display: 'inline-block' }} /> Scheduled rounds
+                      </div>
+                      {d.scheduled.map(r => (
+                        <div key={r.id} style={{ fontSize: 12, padding: '5px 8px', background: 'var(--color-background-primary)', borderRadius: 6, marginBottom: 4 }}>
+                          <strong>{r.interview?.company || 'Unknown'}</strong>
+                          <span style={{ color: 'var(--color-text-secondary)' }}> · Round {r.round_number}{r.round_name ? ' — ' + r.round_name : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {d.done.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: '#27500A', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 2, background: '#639922', display: 'inline-block' }} /> Completed rounds
+                      </div>
+                      {d.done.map(r => (
+                        <div key={r.id} style={{ fontSize: 12, padding: '5px 8px', background: 'var(--color-background-primary)', borderRadius: 6, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <i className="ti ti-check" style={{ fontSize: 11, color: '#639922' }} />
+                          <strong>{r.interview?.company || 'Unknown'}</strong>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>Round {r.round_number}{r.round_name ? ' — ' + r.round_name : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         }
       />

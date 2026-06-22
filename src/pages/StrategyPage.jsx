@@ -233,8 +233,95 @@ function BannerModal({ steps, onClose, onSaved }) {
   )
 }
 
+// ── Card To-do modal ─────────────────────────────────────────
+function CardTodoModal({ card, onClose }) {
+  const [todos, setTodos] = useState([])
+  const [newTask, setNewTask] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.from('strategy_card_todos').select('*').eq('card_id', card.id).order('created_at').then(({ data }) => {
+      setTodos(data || [])
+      setLoading(false)
+    })
+  }, [card.id])
+
+  async function addTask() {
+    const task = newTask.trim()
+    if (!task) return
+    const { data } = await supabase.from('strategy_card_todos').insert({ card_id: card.id, task, completed: false }).select().single()
+    if (data) setTodos(prev => [...prev, data])
+    setNewTask('')
+  }
+
+  async function toggle(todo) {
+    await supabase.from('strategy_card_todos').update({ completed: !todo.completed }).eq('id', todo.id)
+    setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, completed: !t.completed } : t))
+  }
+
+  async function remove(todo) {
+    await supabase.from('strategy_card_todos').delete().eq('id', todo.id)
+    setTodos(prev => prev.filter(t => t.id !== todo.id))
+  }
+
+  const done = todos.filter(t => t.completed).length
+  const pct = todos.length ? Math.round(done / todos.length * 100) : 0
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <div className="modal-title">To-do — {card.name}</div>
+        {card.company && <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: -12, marginBottom: 14 }}>{card.company}</div>}
+
+        {todos.length > 0 && (
+          <div style={{ background: 'var(--surface2)', borderRadius: 'var(--radius)', padding: 10, marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
+              <span style={{ color: 'var(--text2)' }}>Progress</span>
+              <strong>{done} of {todos.length} done</strong>
+            </div>
+            <div style={{ height: 5, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ width: pct + '%', height: '100%', background: '#7C3AED' }} />
+            </div>
+          </div>
+        )}
+
+        {loading ? <div style={{ fontSize: 12, color: 'var(--text3)', padding: '12px 0' }}>Loading...</div> : (
+          <>
+            {todos.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)', textAlign: 'center', padding: 14 }}>No tasks yet. Add one below.</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+              {todos.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius)', padding: '7px 10px' }}>
+                  <input type="checkbox" checked={!!t.completed} onChange={() => toggle(t)} style={{ flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: 12, textDecoration: t.completed ? 'line-through' : 'none', opacity: t.completed ? 0.6 : 1 }}>{t.task}</span>
+                  <button className="btn btn-ghost btn-sm" onClick={() => remove(t)} style={{ padding: '2px 4px' }}><i className="ti ti-x" style={{ fontSize: 12 }} /></button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="search-input"
+            style={{ flex: 1, maxWidth: 'none' }}
+            value={newTask}
+            onChange={e => setNewTask(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addTask()}
+            placeholder="Add a task..."
+          />
+          <button className="btn" onClick={addTask}><i className="ti ti-plus" style={{ fontSize: 13 }} /> Add</button>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Strategy card ─────────────────────────────────────────────
-function StrategyCard({ card, column, alumContacts, onEdit, onDelete }) {
+function StrategyCard({ card, column, alumContacts, onEdit, onDelete, onTodo }) {
   const sc = statusCfg(card.status)
   return (
     <div style={{
@@ -242,11 +329,30 @@ function StrategyCard({ card, column, alumContacts, onEdit, onDelete }) {
       borderRadius: 'var(--radius)', padding: '9px 11px',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 500, fontSize: 13 }}>{card.name}</div>
           {card.company && <div style={{ fontSize: 11, color: 'var(--text2)' }}>{card.company}</div>}
         </div>
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+          {(() => {
+            const todos = card.strategy_card_todos || []
+            const pending = todos.filter(t => !t.completed).length
+            return (
+              <button
+                onClick={() => onTodo(card)}
+                style={{
+                  fontSize: 10, padding: '2px 7px', borderRadius: 8, cursor: 'pointer',
+                  fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 3,
+                  border: '0.5px solid ' + (pending ? '#7C3AED' : 'var(--border-strong)'),
+                  background: pending ? '#7C3AED' : 'var(--surface)',
+                  color: pending ? '#fff' : 'var(--text2)',
+                }}
+              >
+                <i className="ti ti-checklist" style={{ fontSize: 11 }} />
+                {todos.length > 0 ? (pending > 0 ? pending + ' left' : 'Done') : 'To-do'}
+              </button>
+            )
+          })()}
           <button className="btn btn-ghost btn-sm" style={{ padding: '2px 5px' }} onClick={() => onEdit(card)}>
             <i className="ti ti-edit" style={{ fontSize: 12 }} />
           </button>
@@ -294,6 +400,7 @@ export default function StrategyPage() {
   const [editingCard, setEditingCard] = useState(null) // { card, column }
   const [deletingCard, setDeletingCard] = useState(null)
   const [showAddColumn, setShowAddColumn] = useState(false)
+  const [todoCard, setTodoCard] = useState(null)
   const [showBanner, setShowBanner] = useState(false)
 
   useEffect(() => { load() }, [])
@@ -302,7 +409,7 @@ export default function StrategyPage() {
     setLoading(true)
     const [{ data: cols }, { data: cds }, { data: ban }, { data: cts }] = await Promise.all([
       supabase.from('strategy_columns').select('*').order('position').order('created_at'),
-      supabase.from('strategy_cards').select('*').order('position').order('created_at'),
+      supabase.from('strategy_cards').select('*, strategy_card_todos(id, completed)').order('position').order('created_at'),
       supabase.from('strategy_banner').select('*').order('step_number'),
       supabase.from('contacts').select('id, name, company, referral_status').eq('is_active', true),
     ])
@@ -421,6 +528,7 @@ export default function StrategyPage() {
                     alumContacts={alumContacts}
                     onEdit={c => setEditingCard({ card: c, column: col })}
                     onDelete={setDeletingCard}
+                    onTodo={setTodoCard}
                   />
                 ))}
                 {colCards.length === 0 && (
@@ -479,6 +587,9 @@ export default function StrategyPage() {
       )}
       {showAddColumn && (
         <AddColumnModal onClose={() => setShowAddColumn(false)} onSaved={() => { setShowAddColumn(false); load() }} />
+      )}
+      {todoCard && (
+        <CardTodoModal card={todoCard} onClose={() => setTodoCard(null)} />
       )}
       {showBanner && (
         <BannerModal steps={banner} onClose={() => setShowBanner(false)} onSaved={() => { setShowBanner(false); load() }} />
