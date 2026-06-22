@@ -13,6 +13,8 @@ function toKey(date) {
 
 export default function ActivityPage() {
   const [leads, setLeads] = useState([])
+  const [interviews, setInterviews] = useState([])
+  const [interviewRounds, setInterviewRounds] = useState([])
   const [contacts, setContacts] = useState([])
   const [manualActivity, setManualActivity] = useState([])
   const [loading, setLoading] = useState(true)
@@ -28,14 +30,18 @@ export default function ActivityPage() {
 
   async function load() {
     setLoading(true)
-    const [{ data: l }, { data: c }, { data: m }] = await Promise.all([
+    const [{ data: l }, { data: c }, { data: m }, { data: ivs }, { data: ivr }] = await Promise.all([
       supabase.from('cold_leads').select('lead_added_date, reached_out_date, name, company').order('lead_added_date'),
       supabase.from('contacts').select('name, company, last_contact').order('last_contact'),
       supabase.from('daily_activity').select('*'),
+      supabase.from('interviews').select('company, role, applied_date, status'),
+      supabase.from('interview_rounds').select('interview_id, round_name, interview_date, completed'),
     ])
     setLeads(l || [])
     setContacts(c || [])
     setManualActivity(m || [])
+    setInterviews(ivs || [])
+    setInterviewRounds(ivr || [])
     setLoading(false)
   }
 
@@ -73,6 +79,33 @@ export default function ActivityPage() {
 
     return map
   }, [leads, contacts, manualActivity])
+
+  // Interview heatmap — applied dates + round dates
+  const interviewDayMap = useMemo(() => {
+    const map = {}
+    for (const iv of interviews) {
+      if (iv.applied_date) {
+        const k = iv.applied_date
+        if (!map[k]) map[k] = { applied: [], scheduled: [], done: [] }
+        map[k].applied.push(iv)
+      }
+    }
+    for (const r of interviewRounds) {
+      if (r.interview_date) {
+        const k = r.interview_date.slice(0, 10)
+        if (!map[k]) map[k] = { applied: [], scheduled: [], done: [] }
+        if (r.completed) map[k].done.push(r)
+        else map[k].scheduled.push(r)
+      }
+    }
+    return map
+  }, [interviews, interviewRounds])
+
+  function ivDayTotal(k) {
+    const d = interviewDayMap[k]
+    if (!d) return 0
+    return d.applied.length + d.scheduled.length + d.done.length
+  }
 
   function dayTotal(k) {
     const d = dayMap[k]
@@ -175,44 +208,65 @@ export default function ActivityPage() {
 
       {/* Heatmap */}
       <div className="card" style={{ padding: '16px', overflowX: 'auto' }}>
+
         {/* Month labels */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 4, marginLeft: 28 }}>
-          {weeks.map((_, i) => (
-            <div key={i} style={{ width: 16, fontSize: 9, color: 'var(--text3)', textAlign: 'left', flexShrink: 0 }}>
-              {monthLabels[i] || ''}
+        <div style={{ display: 'flex', marginLeft: 34, marginBottom: 3 }}>
+          {weeks.map((week, wi) => (
+            <div key={wi} style={{ width: 18, fontSize: 9, color: 'var(--text3)', flexShrink: 0 }}>
+              {monthLabels[wi] || ''}
             </div>
           ))}
         </div>
 
         <div style={{ display: 'flex', gap: 4 }}>
-          {/* Day labels */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 0 }}>
-            {['Mon', '', 'Wed', '', 'Fri', '', 'Sun'].map((d, i) => (
-              <div key={i} style={{ height: 13, fontSize: 9, color: 'var(--text3)', display: 'flex', alignItems: 'center', width: 24, flexShrink: 0 }}>{d}</div>
+          {/* Day-of-week labels — all 7 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d, i) => (
+              <div key={i} style={{ height: 15, width: 30, fontSize: 9, color: 'var(--text3)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>{d}</div>
             ))}
           </div>
 
-          {/* Grid */}
+          {/* Grid — every cell rendered */}
           <div style={{ display: 'flex', gap: 3 }}>
             {weeks.map((week, wi) => (
-              <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {week.map((day, di) => {
                   const k = toKey(day)
                   const v = dayTotal(k)
-                  const level = intensity(v)
                   const isSel = selectedDay === k
                   const isFuture = day > today
+                  const isBeforeRange = day < startDate
+
+                  // Per-day-of-week color ramps: 0=empty, 1-4=intensity
+                  const DOW = [
+                    ['#E6F1FB','#B5D4F4','#378ADD','#0C447C'], // Mon blue
+                    ['#EEEDFE','#CECBF6','#7F77DD','#3C3489'], // Tue purple
+                    ['#EAF3DE','#C0DD97','#639922','#27500A'], // Wed green
+                    ['#FAEEDA','#FAC775','#EF9F27','#633806'], // Thu amber
+                    ['#FCEBEB','#F7C1C1','#E24B4A','#A32D2D'], // Fri red
+                    ['#E1F5EE','#9FE1CB','#1D9E75','#085041'], // Sat teal
+                    ['#FBEAF0','#F4C0D1','#D4537E','#72243E'], // Sun pink
+                  ]
+                  const ramp = DOW[di] || DOW[0]
+                  const lvl = v === 0 ? -1 : v <= 2 ? 0 : v <= 5 ? 1 : v <= 9 ? 2 : 3
+
+                  const bg = isFuture
+                    ? 'var(--color-background-secondary)'
+                    : lvl === -1
+                    ? 'var(--color-background-secondary)'
+                    : ramp[lvl]
+
                   return (
                     <div
                       key={di}
-                      onClick={() => !isFuture && selectDay(k)}
-                      title={isFuture ? '' : `${format(day, 'MMM d, yyyy')}: ${v} activities`}
+                      onClick={() => !isFuture && !isBeforeRange && selectDay(k)}
+                      title={isFuture ? '' : format(day, 'EEE MMM d') + ': ' + v + ' activities'}
                       style={{
-                        width: 13, height: 13, borderRadius: 2, flexShrink: 0,
-                        background: isFuture ? 'transparent' : CELL_COLORS[level],
-                        border: isSel ? '2px solid #0C447C' : '0.5px solid ' + CELL_BORDER[level],
-                        cursor: isFuture ? 'default' : 'pointer',
-                        opacity: isFuture ? 0 : 1,
+                        width: 15, height: 15, borderRadius: 3, flexShrink: 0,
+                        background: bg,
+                        border: isSel ? '2px solid #0C447C' : '0.5px solid var(--color-border-tertiary)',
+                        cursor: (isFuture || isBeforeRange) ? 'default' : 'pointer',
+                        opacity: isFuture ? 0.2 : isBeforeRange ? 0.35 : 1,
                       }}
                     />
                   )
@@ -223,22 +277,109 @@ export default function ActivityPage() {
         </div>
 
         {/* Legend */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {[
+              ['Mon','#378ADD'],['Tue','#7F77DD'],['Wed','#639922'],
+              ['Thu','#EF9F27'],['Fri','#E24B4A'],['Sat','#1D9E75'],['Sun','#D4537E'],
+            ].map(([d, c]) => (
+              <span key={d} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text3)' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: 'inline-block' }} />{d}
+              </span>
+            ))}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--text3)' }}>
             <span>Less</span>
-            {CELL_COLORS.map((c, i) => (
-              <div key={i} style={{ width: 11, height: 11, borderRadius: 2, background: c, border: i === 0 ? '0.5px solid var(--border)' : 'none' }} />
+            {['var(--color-background-secondary)','#C0DD97','#97C459','#639922','#27500A'].map((c, i) => (
+              <div key={i} style={{ width: 10, height: 10, borderRadius: 2, background: c, border: i === 0 ? '0.5px solid var(--color-border-tertiary)' : 'none' }} />
             ))}
             <span>More</span>
-          </div>
-          <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text3)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: '#639922', display: 'inline-block' }} /> Leads</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: '#7F77DD', display: 'inline-block' }} /> Referrals</span>
           </div>
         </div>
       </div>
 
-      {/* Day detail */}
+      {/* Interviews heatmap */}
+      <div className="card" style={{ padding: '16px', overflowX: 'auto', marginTop: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <i className="ti ti-briefcase" style={{ fontSize: 14 }} /> Interview activity
+          <div style={{ display: 'flex', gap: 12, marginLeft: 8, fontSize: 11, color: 'var(--text2)', fontWeight: 400 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: '#378ADD', display: 'inline-block' }} /> Applied</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: '#EF9F27', display: 'inline-block' }} /> Scheduled</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: '#639922', display: 'inline-block' }} /> Completed round</span>
+          </div>
+        </div>
+
+        {/* Month labels */}
+        <div style={{ display: 'flex', marginLeft: 34, marginBottom: 3 }}>
+          {weeks.map((week, wi) => (
+            <div key={wi} style={{ width: 18, fontSize: 9, color: 'var(--text3)', flexShrink: 0 }}>
+              {monthLabels[wi] || ''}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d, i) => (
+              <div key={i} style={{ height: 15, width: 30, fontSize: 9, color: 'var(--text3)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>{d}</div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 3 }}>
+            {weeks.map((week, wi) => (
+              <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {week.map((day, di) => {
+                  const k = toKey(day)
+                  const d = interviewDayMap[k]
+                  const isFuture = day > today
+                  const isBeforeRange = day < startDate
+
+                  // Color priority: completed round (green) > scheduled (amber) > applied (blue) > empty
+                  const bg = isFuture || !d
+                    ? 'var(--color-background-secondary)'
+                    : d.done.length > 0
+                    ? (d.done.length >= 3 ? '#27500A' : d.done.length === 2 ? '#639922' : '#97C459')
+                    : d.scheduled.length > 0
+                    ? '#EF9F27'
+                    : d.applied.length > 0
+                    ? '#378ADD'
+                    : 'var(--color-background-secondary)'
+
+                  const total = ivDayTotal(k)
+                  return (
+                    <div
+                      key={di}
+                      title={isFuture ? '' : format(day, 'EEE MMM d') + ': ' + total + ' interview activities'}
+                      style={{
+                        width: 15, height: 15, borderRadius: 3, flexShrink: 0,
+                        background: bg,
+                        border: '0.5px solid var(--color-border-tertiary)',
+                        opacity: isFuture ? 0.2 : isBeforeRange ? 0.35 : 1,
+                        cursor: total > 0 && !isFuture && !isBeforeRange ? 'pointer' : 'default',
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Summary below heatmap */}
+        <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+          {interviews.map(iv => (
+            <div key={iv.company + iv.role} style={{ fontSize: 11, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                background: iv.status === 'ongoing' ? '#378ADD' : iv.status === 'coming_up' ? '#EF9F27' : iv.status === 'offer_received' ? '#639922' : '#E24B4A',
+              }} />
+              <strong style={{ color: 'var(--text)' }}>{iv.company}</strong>
+              {iv.role && <span>· {iv.role.length > 30 ? iv.role.slice(0, 30) + '…' : iv.role}</span>}
+            </div>
+          ))}
+          {interviews.length === 0 && <span style={{ fontSize: 11, color: 'var(--text3)' }}>No interviews logged yet.</span>}
+        </div>
+      </div>
       {selectedDay ? (
         <div className="card" style={{ padding: '14px 16px', marginTop: 10 }}>
           <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
