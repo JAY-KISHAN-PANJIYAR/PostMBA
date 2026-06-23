@@ -18,6 +18,107 @@ function statusCfg(v) {
   return STATUS_OPTIONS.find(s => s.v === v) || STATUS_OPTIONS[0]
 }
 
+// ── Imp Links section used inside CardModal ──────────────────
+function LinksSection({ cardId }) {
+  const [links, setLinks] = useState([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!cardId) return
+    supabase.from('strategy_card_links').select('*').eq('card_id', cardId).order('position').order('created_at')
+      .then(({ data }) => { setLinks(data || []); setLoaded(true) })
+  }, [cardId])
+
+  function newBlank() {
+    return { _local: true, _id: Math.random(), url: '', info: '', action_note: '', other_notes: '', done: false }
+  }
+
+  async function saveLink(link) {
+    if (!link.url.trim()) return
+    const payload = { card_id: cardId, url: link.url.trim(), info: link.info || null, action_note: link.action_note || null, other_notes: link.other_notes || null, done: !!link.done, updated_at: new Date().toISOString() }
+    if (link.id) {
+      const { data } = await supabase.from('strategy_card_links').update(payload).eq('id', link.id).select().single()
+      if (data) setLinks(prev => prev.map(l => l.id === data.id ? data : l))
+    } else {
+      const { data } = await supabase.from('strategy_card_links').insert(payload).select().single()
+      if (data) setLinks(prev => prev.map(l => l._id === link._id ? data : l))
+    }
+  }
+
+  async function removeLink(link) {
+    if (link.id) await supabase.from('strategy_card_links').delete().eq('id', link.id)
+    setLinks(prev => prev.filter(l => (l.id || l._id) !== (link.id || link._id)))
+  }
+
+  function updateLocal(link, field, value) {
+    setLinks(prev => prev.map(l => (l.id || l._id) === (link.id || link._id) ? { ...l, [field]: value } : l))
+  }
+
+  if (!cardId) return null
+
+  return (
+    <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
+      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text2)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <i className="ti ti-link" style={{ fontSize: 13 }} /> Important links
+      </div>
+
+      {links.map(link => {
+        const key = link.id || link._id
+        return (
+          <div key={key} style={{ background: 'var(--surface2)', border: '0.5px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 12px', marginBottom: 8, opacity: link.done ? 0.55 : 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <i className="ti ti-external-link" style={{ fontSize: 13, color: 'var(--text3)', flexShrink: 0 }} />
+              <input
+                value={link.url || ''}
+                onChange={e => updateLocal(link, 'url', e.target.value)}
+                onBlur={() => saveLink(link)}
+                placeholder="https://linkedin.com/in/..."
+                style={{ flex: 1, fontSize: 12, border: 'none', background: 'transparent', color: '#0C447C', outline: 'none', minWidth: 0 }}
+              />
+              <button className="btn btn-ghost btn-sm" style={{ padding: '2px 4px', color: '#A32D2D', flexShrink: 0 }} onClick={() => removeLink(link)}>
+                <i className="ti ti-trash" style={{ fontSize: 12 }} />
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Info</label>
+                <input value={link.info || ''} onChange={e => updateLocal(link, 'info', e.target.value)} onBlur={() => saveLink(link)} placeholder="LinkedIn, job post, company page..." />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>To (action)</label>
+                <input value={link.action_note || ''} onChange={e => updateLocal(link, 'action_note', e.target.value)} onBlur={() => saveLink(link)} placeholder="Ask for referral, apply by Fri..." />
+              </div>
+            </div>
+            <div className="form-group" style={{ marginBottom: 8 }}>
+              <label>Other notes</label>
+              <input value={link.other_notes || ''} onChange={e => updateLocal(link, 'other_notes', e.target.value)} onBlur={() => saveLink(link)} placeholder="Extra context..." />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text2)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!link.done}
+                  onChange={e => { updateLocal(link, 'done', e.target.checked); saveLink({ ...link, done: e.target.checked }) }}
+                /> Mark as done
+              </label>
+              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, fontWeight: 500,
+                background: link.done ? '#EAF3DE' : '#E6F1FB',
+                color: link.done ? '#27500A' : '#0C447C' }}>
+                {link.done ? 'Done' : 'Pending'}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+
+      <button
+        onClick={() => setLinks(prev => [...prev, newBlank()])}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px', width: '100%', borderRadius: 'var(--radius)', border: '1px dashed var(--border-strong)', fontSize: 12, color: 'var(--text3)', cursor: 'pointer', background: 'none' }}
+      >
+        <i className="ti ti-plus" style={{ fontSize: 12 }} /> Add link
+      </button>
+    </div>
+  )
+}
+
 // ── Add/Edit card modal ───────────────────────────────────────
 function CardModal({ card, column, alumContacts, onClose, onSaved }) {
   const isAlums = column.name === 'Alums'
@@ -139,6 +240,8 @@ function CardModal({ card, column, alumContacts, onClose, onSaved }) {
               placeholder="Context, what to discuss, follow-up actions..." />
           </div>
         </div>
+
+        {isEdit && <LinksSection cardId={card.id} />}
 
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>Cancel</button>
@@ -380,6 +483,17 @@ function StrategyCard({ card, column, alumContacts, onEdit, onDelete, onTodo }) 
         }}>{card.notes}</div>
       )}
 
+      {(() => {
+        const links = card.strategy_card_links || []
+        const pendingLinks = links.filter(l => !l.done).length
+        if (links.length === 0) return null
+        return (
+          <div style={{ fontSize: 10, color: pendingLinks > 0 ? '#0C447C' : '#27500A', marginTop: 5, display: 'flex', alignItems: 'center', gap: 3 }}>
+            <i className="ti ti-link" style={{ fontSize: 10 }} />
+            {pendingLinks > 0 ? pendingLinks + ' link' + (pendingLinks > 1 ? 's' : '') + ' pending' : 'All links done'}
+          </div>
+        )
+      })()}
       {card.contact_id && (
         <div style={{ fontSize: 9, color: '#3C3489', marginTop: 5, display: 'flex', alignItems: 'center', gap: 3 }}>
           <i className="ti ti-link" style={{ fontSize: 9 }} /> Synced to Referral details
@@ -409,7 +523,7 @@ export default function StrategyPage() {
     setLoading(true)
     const [{ data: cols }, { data: cds }, { data: ban }, { data: cts }] = await Promise.all([
       supabase.from('strategy_columns').select('*').order('position').order('created_at'),
-      supabase.from('strategy_cards').select('*, strategy_card_todos(id, completed)').order('position').order('created_at'),
+      supabase.from('strategy_cards').select('*, strategy_card_todos(id, completed), strategy_card_links(id, done)').order('position').order('created_at'),
       supabase.from('strategy_banner').select('*').order('step_number'),
       supabase.from('contacts').select('id, name, company, referral_status').eq('is_active', true),
     ])
