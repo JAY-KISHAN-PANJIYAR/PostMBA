@@ -1,4 +1,3 @@
-import BannerReminder from '../components/BannerReminder.jsx'
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { getUrgency, daysSince } from '../lib/utils.js'
@@ -7,12 +6,14 @@ import GridCard from '../components/GridCard.jsx'
 import KanbanBoard from '../components/KanbanBoard.jsx'
 import ContactModal from '../components/ContactModal.jsx'
 import TagManagerModal from '../components/TagManagerModal.jsx'
+import TodosKanban from '../components/TodosKanban.jsx'
+import BannerReminder from '../components/BannerReminder.jsx'
 
 const SORT_OPTIONS = [
   { value: 'urgency', label: 'Sort: Urgency' },
-  { value: 'company', label: 'Sort: Company A–Z' },
+  { value: 'company', label: 'Sort: Company A-Z' },
   { value: 'last_contact', label: 'Sort: Last contact' },
-  { value: 'name', label: 'Sort: Name A–Z' },
+  { value: 'name', label: 'Sort: Name A-Z' },
 ]
 
 const URGENCY_ORDER = { overdue: 0, soon: 1, 'no-date': 2, ok: 3, secured: 4, inactive: 5 }
@@ -22,25 +23,21 @@ function generateInsight(contacts) {
   if (overdue.length > 0) {
     const top = overdue.sort((a, b) => (daysSince(b.last_contact) || 0) - (daysSince(a.last_contact) || 0))[0]
     const days = daysSince(top.last_contact)
-    return `${top.name || top.company} at ${top.company} is ${days} days overdue — longest gap in your active contacts.`
+    return (top.name || top.company) + ' at ' + top.company + ' is ' + days + ' days overdue — longest gap in your active contacts.'
   }
   const secured = contacts.filter(c => getUrgency(c) === 'secured')
-  if (secured.length > 0) return `You have ${secured.length} referral${secured.length > 1 ? 's' : ''} secured. Keep nurturing those relationships.`
+  if (secured.length > 0) return 'You have ' + secured.length + ' referral' + (secured.length > 1 ? 's' : '') + ' secured. Keep nurturing those relationships.'
   return 'All contacts are up to date.'
 }
 
-function ViewToggle({ view, onChange }) {
+function ViewToggle({ view, onChange, todoPendingCount }) {
   const views = [
     { id: 'list',   icon: 'ti-list',        label: 'List' },
     { id: 'grid',   icon: 'ti-layout-grid', label: 'Grid' },
     { id: 'kanban', icon: 'ti-layout-columns', label: 'Kanban' },
   ]
   return (
-    <div style={{
-      display: 'flex', gap: 2,
-      background: 'var(--surface2)',
-      borderRadius: 8, padding: 3,
-    }}>
+    <div style={{ display: 'flex', gap: 2, background: 'var(--surface2)', borderRadius: 8, padding: 3 }}>
       {views.map(v => (
         <button
           key={v.id}
@@ -57,10 +54,32 @@ function ViewToggle({ view, onChange }) {
             transition: 'all 0.1s',
           }}
         >
-          <i className={`ti ${v.icon}`} style={{ fontSize: 14 }} />
+          <i className={'ti ' + v.icon} style={{ fontSize: 14 }} />
           {v.label}
         </button>
       ))}
+      <button
+        onClick={() => onChange('todos')}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: '5px 10px', borderRadius: 6,
+          border: view === 'todos' ? '0.5px solid #EAB308' : 'none',
+          cursor: 'pointer',
+          background: view === 'todos' ? '#FEF08A' : 'transparent',
+          color: view === 'todos' ? '#713F12' : 'var(--text3)',
+          fontWeight: view === 'todos' ? 500 : 400,
+          fontSize: 12,
+          transition: 'all 0.1s',
+        }}
+      >
+        <i className="ti ti-checkbox" style={{ fontSize: 14 }} />
+        To-dos
+        {todoPendingCount > 0 && (
+          <span style={{ background: '#EAB308', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 10, fontWeight: 600, marginLeft: 2 }}>
+            {todoPendingCount}
+          </span>
+        )}
+      </button>
     </div>
   )
 }
@@ -78,8 +97,20 @@ export default function ReferralPage() {
   const [editingContact, setEditingContact] = useState(null)
   const [showTagManager, setShowTagManager] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [todoPendingCount, setTodoPendingCount] = useState(0)
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    async function countTodos() {
+      const { count } = await supabase
+        .from('contact_todos')
+        .select('*', { count: 'exact', head: true })
+        .eq('completed', false)
+      setTodoPendingCount(count || 0)
+    }
+    countTodos()
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -150,7 +181,7 @@ export default function ReferralPage() {
     setShowModal(true)
   }
 
-  if (loading) return <div className="loading"><i className="ti ti-loader" /> Loading contacts…</div>
+  if (loading) return <div className="loading"><i className="ti ti-loader" /> Loading contacts...</div>
 
   return (
     <div>
@@ -161,7 +192,7 @@ export default function ReferralPage() {
           Referral details
         </h1>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <ViewToggle view={view} onChange={setView} />
+          <ViewToggle view={view} onChange={setView} todoPendingCount={todoPendingCount} />
           <button className="btn btn-sm" onClick={() => setShowTagManager(true)}>
             <i className="ti ti-tag" /> Tags
           </button>
@@ -189,13 +220,13 @@ export default function ReferralPage() {
         </div>
       )}
 
-      {/* Filters — hidden in kanban since kanban has its own grouping */}
-      {view !== 'kanban' && (
+      {/* Filters - hidden in kanban and todos views */}
+      {view !== 'kanban' && view !== 'todos' && (
         <>
           <div className="filter-bar">
             <input
               className="search-input"
-              placeholder="Search name, company, email…"
+              placeholder="Search name, company, email..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -213,7 +244,7 @@ export default function ReferralPage() {
                 { value: 'soon', label: 'Follow up soon' },
                 { value: 'secured', label: 'Secured' },
               ].map(p => (
-                <button key={p.value} className={`pill${filterStatus === p.value ? ' active' : ''}`} onClick={() => setFilterStatus(p.value)}>
+                <button key={p.value} className={'pill' + (filterStatus === p.value ? ' active' : '')} onClick={() => setFilterStatus(p.value)}>
                   {p.label}
                 </button>
               ))}
@@ -222,7 +253,7 @@ export default function ReferralPage() {
           <div className="filter-bar" style={{ marginBottom: 16 }}>
             <span style={{ fontSize: 11, color: 'var(--text3)', marginRight: 2 }}>Tags:</span>
             <div className="pill-group">
-              <button className={`pill${filterTagId === 'all' ? ' active' : ''}`} onClick={() => setFilterTagId('all')}>All</button>
+              <button className={'pill' + (filterTagId === 'all' ? ' active' : '')} onClick={() => setFilterTagId('all')}>All</button>
               {tags.map(tag => (
                 <button
                   key={tag.id}
@@ -243,14 +274,14 @@ export default function ReferralPage() {
         <div className="filter-bar" style={{ marginBottom: 16 }}>
           <input
             className="search-input"
-            placeholder="Search name, company…"
+            placeholder="Search name, company..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
       )}
 
-      {/* ── LIST VIEW ── */}
+      {/* LIST VIEW */}
       {view === 'list' && (
         <>
           {activeContacts.length > 0 && (
@@ -281,7 +312,7 @@ export default function ReferralPage() {
         </>
       )}
 
-      {/* ── GRID VIEW ── */}
+      {/* GRID VIEW */}
       {view === 'grid' && (
         <>
           {activeContacts.length > 0 && (
@@ -324,9 +355,23 @@ export default function ReferralPage() {
         </>
       )}
 
-      {/* ── KANBAN VIEW ── */}
+      {/* KANBAN VIEW */}
       {view === 'kanban' && (
         <KanbanBoard contacts={filtered} tags={tags} onEdit={openEdit} />
+      )}
+
+      {/* TODOS VIEW */}
+      {view === 'todos' && (
+        <TodosKanban contacts={contacts} tags={tags} onTodoChange={() => {
+          async function recount() {
+            const { count } = await supabase
+              .from('contact_todos')
+              .select('*', { count: 'exact', head: true })
+              .eq('completed', false)
+            setTodoPendingCount(count || 0)
+          }
+          recount()
+        }} />
       )}
 
       {/* Modals */}
