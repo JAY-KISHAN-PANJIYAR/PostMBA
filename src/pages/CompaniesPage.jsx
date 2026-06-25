@@ -1,3 +1,4 @@
+import BannerReminder from '../components/BannerReminder.jsx'
 import { useState, useEffect, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../lib/supabase.js'
@@ -101,6 +102,7 @@ export default function CompaniesPage() {
 
   return (
     <div>
+      <BannerReminder />
       <div className="page-header">
         <h1 className="page-title">
           <i className="ti ti-calendar" style={{ marginRight: 8, fontSize: 20 }} />

@@ -1,3 +1,4 @@
+import BannerReminder from '../components/BannerReminder.jsx'
 import { useState, useEffect, useMemo } from 'react'
 import { format, parseISO, subDays, eachDayOfInterval, startOfWeek, isValid, startOfMonth, endOfMonth, getDay, getDaysInMonth, addMonths } from 'date-fns'
 import { supabase } from '../lib/supabase.js'
@@ -290,6 +291,7 @@ export default function ActivityPage() {
 
   return (
     <div>
+      <BannerReminder />
       <div className="page-header">
         <h1 className="page-title">
           <i className="ti ti-activity" style={{ marginRight: 8, fontSize: 20 }} />

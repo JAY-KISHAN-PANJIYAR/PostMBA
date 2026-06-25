@@ -1,3 +1,4 @@
+import BannerReminder from '../components/BannerReminder.jsx'
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { initials, avatarColor } from '../lib/utils.js'
@@ -209,6 +210,7 @@ export default function LeadsPage() {
 
   return (
     <div>
+      <BannerReminder />
       <div className="page-header">
         <h1 className="page-title">
           <i className="ti ti-users" style={{ marginRight: 8, fontSize: 20 }} />
