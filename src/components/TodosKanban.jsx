@@ -51,23 +51,23 @@ export default function TodosKanban({ contacts, tags, onTodoChange }) {
   const columns = tags.map((tag, idx) => {
     const tagContacts = contacts.filter(c =>
       (c.contact_tags || []).some(ct => ct.tag_id === tag.id)
-    ).filter(c => pendingTodos.some(t => t.contact_id === c.id))
+    ).filter(c => todos.some(t => t.contact_id === c.id))
     return { tag, contacts: tagContacts, color: tag.color || colColors[idx % colColors.length] }
   }).filter(col => col.contacts.length > 0)
 
   const untaggedContacts = contacts.filter(c =>
     !(c.contact_tags || []).length &&
-    pendingTodos.some(t => t.contact_id === c.id)
+    todos.some(t => t.contact_id === c.id)
   )
   if (untaggedContacts.length) {
     columns.push({ tag: { id: 'none', name: 'No tag' }, contacts: untaggedContacts, color: '#888780' })
   }
 
-  if (!totalPending) {
+  if (!todos.length) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text3)', fontSize: 13 }}>
         <i className="ti ti-checkbox" style={{ fontSize: 32, display: 'block', marginBottom: 10 }} />
-        No pending to-dos. Add one from any contact card.
+        No to-dos yet. Add one from any contact card.
       </div>
     )
   }
@@ -88,7 +88,8 @@ export default function TodosKanban({ contacts, tags, onTodoChange }) {
                 <span style={{ fontSize: 11, background: 'var(--surface)', border: '0.5px solid var(--border-strong)', color: 'var(--text3)', borderRadius: 10, padding: '1px 8px' }}>{colPendingCount}</span>
               </div>
               {col.contacts.map(contact => {
-                const contactPending = pendingTodos.filter(t => t.contact_id === contact.id)
+                const contactPending = todos.filter(t => t.contact_id === contact.id && !t.completed)
+                const contactDone = todos.filter(t => t.contact_id === contact.id && t.completed)
                 const [bg, fg] = avatarColor(contact.name || contact.company)
                 return (
                   <div key={contact.id} style={{ marginBottom: 14 }}>
@@ -113,6 +114,24 @@ export default function TodosKanban({ contacts, tags, onTodoChange }) {
                         </button>
                       </div>
                     ))}
+                    {contactDone.length > 0 && (
+                      <div style={{ marginTop: contactPending.length ? 6 : 0 }}>
+                        {contactDone.map(todo => (
+                          <div key={todo.id} style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 8, padding: '7px 9px', marginBottom: 5, display: 'flex', alignItems: 'flex-start', gap: 7, opacity: 0.5 }}>
+                            <button
+                              onClick={() => toggleTodo(todo)}
+                              style={{ width: 14, height: 14, borderRadius: 3, background: '#27500A', border: '1.5px solid #27500A', cursor: 'pointer', flexShrink: 0, marginTop: 1, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <i className="ti ti-check" style={{ fontSize: 9, color: '#fff' }} />
+                            </button>
+                            <span style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.4, flex: 1, textDecoration: 'line-through' }}>{todo.text}</span>
+                            <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0, flexShrink: 0 }}>
+                              <i className="ti ti-x" style={{ fontSize: 11 }} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                       <input
                         placeholder="Add to-do..."
