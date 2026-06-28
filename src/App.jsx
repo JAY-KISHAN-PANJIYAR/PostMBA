@@ -6,6 +6,7 @@ import TargetCompaniesPage from './pages/TargetCompaniesPage.jsx'
 import InterviewPage from './pages/InterviewPage.jsx'
 import ActivityPage from './pages/ActivityPage.jsx'
 import StrategyPage from './pages/StrategyPage.jsx'
+import HRContactsPage from './pages/HRContactsPage.jsx'
 
 function Sidebar() {
   return (
@@ -34,6 +35,10 @@ function Sidebar() {
         <i className="ti ti-user-search" />
         Leads
       </NavLink>
+      <NavLink to="/hr-contacts" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
+        <i className="ti ti-address-book" />
+        HR contacts
+      </NavLink>
       <NavLink to="/target-companies" className={({ isActive }) => 'nav-link' + (isActive ? ' active' : '')}>
         <i className="ti ti-target" />
         Target companies
@@ -55,6 +60,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<ReferralPage />} />
             <Route path="/leads" element={<LeadsPage />} />
+            <Route path="/hr-contacts" element={<HRContactsPage />} />
             <Route path="/target-companies" element={<TargetCompaniesPage />} />
             <Route path="/interviews" element={<InterviewPage />} />
             <Route path="/activity" element={<ActivityPage />} />
