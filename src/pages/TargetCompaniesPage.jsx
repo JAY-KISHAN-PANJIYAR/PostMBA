@@ -1,7 +1,8 @@
-import BannerReminder from '../components/BannerReminder.jsx'
 import { useState, useEffect, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../lib/supabase.js'
+import NotesKanban from '../components/NotesKanban.jsx'
+import BannerReminder from '../components/BannerReminder.jsx'
 
 const PRIORITY = {
   high:   { label: 'High',   bg: '#FCEBEB', color: '#A32D2D' },
@@ -498,6 +499,9 @@ export default function TargetCompaniesPage() {
                 <i className={'ti ' + v.icon} style={{ fontSize: 14 }} /> {v.label}
               </button>
             ))}
+            <button onClick={() => setView('notes')} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: view === 'notes' ? '0.5px solid #EAB308' : 'none', cursor: 'pointer', background: view === 'notes' ? '#FEF08A' : 'transparent', color: view === 'notes' ? '#713F12' : 'var(--text3)', fontWeight: view === 'notes' ? 500 : 400, fontSize: 12 }}>
+              <i className="ti ti-notes" style={{ fontSize: 14 }} /> Notes
+            </button>
           </div>
           <button className="btn" onClick={() => setShowVerticalModal(true)}><i className="ti ti-plus" /> Add vertical</button>
           <button className="btn btn-primary" onClick={() => setShowModal(true)}><i className="ti ti-plus" /> Add company</button>
@@ -552,6 +556,10 @@ export default function TargetCompaniesPage() {
           {filtered.length === 0 && <div className="empty">No target companies match your filters.</div>}
           {filtered.map(e => <TargetCompanyCard key={e.id} company={e} verticals={verticals} onUpdate={load} onDelete={setDeleteConfirm} />)}
         </div>
+      )}
+
+      {view === 'notes' && (
+        <NotesKanban verticals={verticals} targets={enriched} />
       )}
 
       {showModal && <AddCompanyModal existingCompanies={existingCompanies} verticals={verticals} onClose={() => setShowModal(false)} onSaved={() => { setShowModal(false); load() }} />}
