@@ -93,6 +93,21 @@ function NoteExpandModal({ note, screenshots, onClose, onRefresh }) {
         </div>
 
         <div style={{ overflowY: 'auto', padding: '16px 18px', flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notes</div>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            autoFocus
+            placeholder="Type your notes here..."
+            style={{ width: '100%', fontSize: 13, color: 'var(--text)', lineHeight: 1.6, padding: '10px 12px', borderRadius: 8, border: '0.5px solid var(--border-strong)', background: 'var(--surface2)', resize: 'vertical', minHeight: 260, fontFamily: 'inherit', outline: 'none', fontSize: 14, lineHeight: 1.7 }}
+          />
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', fontSize: 12, color: 'var(--text3)', cursor: 'pointer', padding: '9px 0', border: '0.5px dashed var(--border-strong)', borderRadius: 8, background: 'transparent', marginBottom: 16, width: '100%', marginTop: 14 }}>
+            <i className="ti ti-paperclip" style={{ fontSize: 13 }} />
+            {uploading ? 'Uploading...' : 'Add screenshot'}
+            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadScreenshot} disabled={uploading} />
+          </label>
+
           {myScreenshots.length > 0 && (
             <>
               <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -117,21 +132,6 @@ function NoteExpandModal({ note, screenshots, onClose, onRefresh }) {
               </div>
             </>
           )}
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', fontSize: 12, color: 'var(--text3)', cursor: 'pointer', padding: '9px 0', border: '0.5px dashed var(--border-strong)', borderRadius: 8, background: 'transparent', marginBottom: 16, width: '100%' }}>
-            <i className="ti ti-paperclip" style={{ fontSize: 13 }} />
-            {uploading ? 'Uploading...' : 'Add screenshot'}
-            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={uploadScreenshot} disabled={uploading} />
-          </label>
-
-          <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notes</div>
-          <textarea
-            value={text}
-            onChange={e => setText(e.target.value)}
-            autoFocus
-            placeholder="Type your notes here..."
-            style={{ width: '100%', fontSize: 13, color: 'var(--text)', lineHeight: 1.6, padding: '10px 12px', borderRadius: 8, border: '0.5px solid var(--border-strong)', background: 'var(--surface2)', resize: 'vertical', minHeight: 140, fontFamily: 'inherit', outline: 'none' }}
-          />
 
           {confirmDelete && (
             <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '10px 12px', marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
